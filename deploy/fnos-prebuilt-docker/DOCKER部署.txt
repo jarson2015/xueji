@@ -1,0 +1,49 @@
+学迹 · 预编译目录 + Docker 一次部署
+====================================
+
+你的目录（已上传）：
+  /vol1/1000/www/xueji/api
+  /vol1/1000/www/xueji/web
+  /vol1/1000/www/xueji/data/uploads
+
+还需要放到同一目录的文件（本包已带）：
+  docker-compose.fnos.yml
+  nginx-web.conf
+  .env
+  api/Dockerfile
+  api/docker-entrypoint.sh
+
+────────────────────────────────
+步骤
+────────────────────────────────
+
+1) 确认上述文件都在 /vol1/1000/www/xueji/ 下
+   （把本包里的 compose / nginx / .env / api/Dockerfile / api/docker-entrypoint.sh 拷上去）
+
+2) 检查 .env
+   - DB_HOST=192.168.10.250（MySQL 端口已映射到 NAS 时）
+     或改成 MySQL 容器名（需与学迹同一 Docker 网络）
+   - 密码、JWT、CORS 已按你的配置写好；CORS 末尾不要有分号
+
+3) Docker 项目管理
+   - 工作目录：/vol1/1000/www/xueji
+   - Compose 文件：docker-compose.fnos.yml
+   - 环境文件：.env
+   - 构建并启动
+
+   或终端：
+   cd /vol1/1000/www/xueji
+   docker compose -f docker-compose.fnos.yml --env-file .env up -d --build
+
+4) 验证
+   http://192.168.10.250:8080
+   http://192.168.10.250:8080/api/health   → "db":"up"
+   然后注册家长账号
+
+────────────────────────────────
+说明
+────────────────────────────────
+
+- web 用官方 nginx 镜像挂载静态文件，不需要 Dockerfile
+- api 用 api/Dockerfile 安装 node_modules 后跑 dist（只需构建一次）
+- 上传文件落在 data/uploads，已绑定进容器

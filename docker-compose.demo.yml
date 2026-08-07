@@ -1,0 +1,24 @@
+# Local / demo overlay — DO NOT use on the public internet.
+# Usage:
+#   cp .env.compose.example .env   # then edit, or use values below via:
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml --env-file .env.demo up -d --build
+#
+# Prefer creating `.env.demo` from this file's environment block.
+
+services:
+  mysql:
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-demo-root-only-local}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-demo-study-only-local}
+
+  api:
+    environment:
+      # Long enough for length check; still blocked if NODE_ENV=production without override —
+      # demo overlay forces development-like demo flags while keeping NODE_ENV=production for sync off.
+      JWT_SECRET: ${JWT_SECRET:-local-demo-jwt-secret-min-24-chars-xx}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:8080}
+      RUN_SEED_ON_START: "true"
+      ENABLE_DEMO_HINTS: "true"
+      # Allow the local demo JWT (not in production known-weak list when customized above)
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}

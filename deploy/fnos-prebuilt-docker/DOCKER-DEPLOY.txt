@@ -1,0 +1,45 @@
+学迹 · 预编译目录 + Docker 一次部署
+====================================
+
+目标目录：
+  /vol1/1000/www/xueji
+
+本包包含：
+  docker-compose.fnos.yml
+  nginx-web.conf
+  .env.example
+  OVERWRITE.txt（覆盖升级说明）
+  api/（dist + package.json + docker-start.sh）
+  web/
+  data/uploads/
+
+────────────────────────────────
+步骤
+────────────────────────────────
+
+1) 解压到 /vol1/1000/www/xueji（覆盖升级见 OVERWRITE.txt）
+
+2) 检查 .env（首次：cp .env.example .env）
+   - XUEJI_DB_HOST / DB_PASSWORD / JWT_SECRET / CORS_ORIGIN
+
+3) 启动
+   cd /vol1/1000/www/xueji
+   docker compose -f docker-compose.fnos.yml --env-file .env up -d
+
+4) 验证
+   http://NAS_IP:8080
+   http://NAS_IP:8080/api/health
+
+5) 含新功能（如积分赠予 / 迁移 0020）时
+   首次或升级请设 DB_MIGRATIONS_RUN=true，跑通后改回 false
+   详见 OVERWRITE.txt
+
+────────────────────────────────
+说明
+────────────────────────────────
+
+- web 用官方 nginx 镜像挂载静态文件
+- api 用 node:20 镜像挂载预编译 dist，首次按 docker-start.sh 装依赖
+- 上传文件落在 data/uploads
+- 覆盖生产时务必保留 .env 与 data/uploads
+- 积分赠予与约定共用开关；低龄家庭不可开

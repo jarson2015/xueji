@@ -1,0 +1,82 @@
+学迹 · 手动导入空白库（飞牛 MySQL）
+====================================
+
+适用：你已经建好空库（如 study_checkin），想用图形界面/SQL 导入表结构，
+而不是依赖 ./install.sh 里的 node 迁移。
+
+文件：schema-blank.sql（与本说明同目录）
+
+────────────────────────────────
+步骤 A：确认空库已存在
+────────────────────────────────
+
+库名建议：study_checkin
+字符集：utf8mb4 / utf8mb4_unicode_ci
+
+若还没有库，在 MySQL 里执行：
+
+  CREATE DATABASE IF NOT EXISTS study_checkin
+    DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+────────────────────────────────
+步骤 B：导入 schema-blank.sql
+────────────────────────────────
+
+【方式 1 · 飞牛 / phpMyAdmin】
+  1. 打开 phpMyAdmin（或飞牛 MySQL 管理）
+  2. 左侧点选库 study_checkin（必须先选中库）
+  3. 顶部「导入」/ Import
+  4. 选择文件 schema-blank.sql
+  5. 字符集选 utf8mb4（或 utf8）
+  6. 执行 → 应显示成功
+
+【方式 2 · 命令行】
+  mysql -u study -p -h 127.0.0.1 study_checkin < schema-blank.sql
+
+  （把 study 换成你的数据库用户名）
+
+────────────────────────────────
+步骤 C：核对
+────────────────────────────────
+
+在 study_checkin 里应能看到这些表（均为空，无演示账号）：
+
+  users, parent_students, family_settings, family_invites,
+  push_subscriptions, tasks, task_steps, task_assigns, checkins,
+  study_plans, plan_items, point_ledgers, wish_items, wish_redeems,
+  audit_logs, allowance_accounts, allowance_goals, allowance_entries,
+  migrations
+
+migrations 表里应有 8 行记录（表示结构已就绪）。
+
+────────────────────────────────
+步骤 D：继续装应用（跳过迁移）
+────────────────────────────────
+
+编辑安装包根目录 .env，保证：
+
+  DB_TYPE=mysql
+  DB_HOST=127.0.0.1
+  DB_PORT=3306
+  DB_USER=你的用户
+  DB_PASSWORD=你的密码
+  DB_NAME=study_checkin
+  DB_SYNCHRONIZE=false
+  DB_MIGRATIONS_RUN=false
+
+然后：
+
+  ./install.sh
+  # 若 install 里迁移提示 No pending migrations，属正常
+  ./start.sh
+
+首次使用：打开网站 → 注册家长账号（空白库无演示数据）。
+
+────────────────────────────────
+注意
+────────────────────────────────
+
+- 本 SQL 只建表，不含任何用户/任务数据。
+- 若库里已有同名表且结构旧，不要直接导入；应备份后重建空库再导入，
+  或改用 ./install.sh 的迁移（仅适合空库/兼容路径）。
+- 导入后请勿再手动清空 migrations 表，否则下次迁移可能对已有列再 ALTER 失败。

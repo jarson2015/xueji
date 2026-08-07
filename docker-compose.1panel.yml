@@ -1,0 +1,25 @@
+# 可选：让学迹 api/web 加入「已有 MySQL 容器」所在的 Docker 网络
+# 这样 .env 里 DB_HOST 可以直接填 MySQL 容器名
+#
+# 1. 在 Docker 管理里打开 MySQL 容器 → 详情 → 复制「网络名称」
+# 2. 把下面 name 改成该网络名
+# 3. 启动：
+#    docker compose -f docker-compose.fnos.yml -f docker-compose.1panel.yml --env-file .env up -d --build
+#
+# Docker 项目管理若支持多文件，把本文件与 docker-compose.fnos.yml 一起勾选
+
+services:
+  api:
+    networks:
+      - default
+      - mysql_net
+  web:
+    networks:
+      - default
+      - mysql_net
+
+networks:
+  mysql_net:
+    external: true
+    # 改成你的 MySQL 网络名，例如：1panel-network / bridge / 自定义名
+    name: 1panel-network

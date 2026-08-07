@@ -1,0 +1,83 @@
+学迹 · 预编译 Docker 包 — 覆盖生产部署
+========================================
+
+目标目录（与 compose 一致）：
+  /vol1/1000/www/xueji
+
+包内结构：
+  docker-compose.fnos.yml
+  nginx-web.conf
+  .env.example
+  OVERWRITE.txt（本文件）
+  api/dist + package.json + docker-start.sh
+  web/（前端静态）
+  data/uploads/（空占位，勿覆盖生产上传）
+
+────────────────────────────────
+覆盖升级（推荐）
+────────────────────────────────
+
+1) 备份（在 NAS 上）
+   cd /vol1/1000/www/xueji
+   cp .env .env.bak.YYYYMMDD
+   # 务必保留 data/uploads
+
+2) 停容器
+   docker compose -f docker-compose.fnos.yml --env-file .env down
+
+3) 解压本 zip 到临时目录，再覆盖代码（保留 .env 与 uploads）
+   示例：解压到 /tmp/xueji-new 后执行
+
+   rsync -a --delete \
+     --exclude '.env' \
+     --exclude 'data/uploads/' \
+     --exclude 'api/node_modules/' \
+     /tmp/xueji-new/ /vol1/1000/www/xueji/
+
+   或手动覆盖：
+   - api/dist、api/package.json、api/package-lock.json、api/docker-start.sh
+   - 整个 web/
+   - docker-compose.fnos.yml、nginx-web.conf
+   - 不要覆盖 .env
+   - 不要清空 data/uploads
+
+4) 若本次含数据库迁移
+   编辑 .env：DB_MIGRATIONS_RUN=true
+   （仅本次启动需要；成功后改回 false）
+
+   本功能相关迁移示例：
+   - 0018 users.age_band
+   - 0019 makeup/愿望默认
+   - 0020 point_gifts + 赠予限额字段（积分赠予）
+   - 0021 tasks.is_interest + meaning_note（兴趣任务）
+
+5) 启动
+   cd /vol1/1000/www/xueji
+   # 确保 nginx-web.conf、api/docker-start.sh 是「文件」不是空目录
+   docker compose -f docker-compose.fnos.yml --env-file .env up -d
+
+6) 验证
+   curl -s http://127.0.0.1:8080/api/health
+   浏览器打开 CORS_ORIGIN 对应地址
+   积分赠予：家长「休息与约定」打开总开关后，学生端「积分约定」应出现「赠予」Tab
+
+7) 迁移跑完后
+   DB_MIGRATIONS_RUN=false
+   docker compose -f docker-compose.fnos.yml --env-file .env up -d
+
+────────────────────────────────
+全新安装
+────────────────────────────────
+
+1) 解压到 /vol1/1000/www/xueji
+2) cp .env.example .env 并改密码 / JWT / CORS / XUEJI_DB_HOST
+3) docker compose -f docker-compose.fnos.yml --env-file .env up -d
+4) 首次可设 DB_MIGRATIONS_RUN=true
+
+────────────────────────────────
+注意
+────────────────────────────────
+
+- 本包不含 node_modules；容器首次启动会按 docker-start.sh 安装依赖
+- 切勿把开发机 .env 打进压缩包覆盖生产
+- 若 Docker 曾把 nginx-web.conf 建成目录：rm -rf nginx-web.conf 后重新上传文件

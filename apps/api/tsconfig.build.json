@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/smoke.ts",
+    "src/bench-monitor.ts",
+    "src/run-migrations.ts",
+    "src/seed.ts",
+    "src/**/*.spec.ts"
+  ]
+}
