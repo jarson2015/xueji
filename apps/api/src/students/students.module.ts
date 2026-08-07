@@ -8,6 +8,8 @@ import {
 } from '../entities/student-prefs.entity';
 import { StudentWeeklyReview } from '../entities/student-weekly-review.entity';
 import { JournalPost } from '../entities/journal.entity';
+import { CheckIn } from '../entities/checkin.entity';
+import { TaskAssign } from '../entities/task-assign.entity';
 import { StudentsService } from './students.service';
 import { StudentsController } from './students.controller';
 import { StudentMeController } from './student-me.controller';
@@ -24,6 +26,8 @@ import { AuthModule } from '../auth/auth.module';
       StudentDailyFocus,
       StudentWeeklyReview,
       JournalPost,
+      CheckIn,
+      TaskAssign,
     ]),
     forwardRef(() => FamilyModule),
     forwardRef(() => AuthModule),

@@ -323,6 +323,13 @@ import MonitorFamilyFeed from '../../components/MonitorFamilyFeed.vue'
 import MonitorChildFilter from '../../components/MonitorChildFilter.vue'
 import ThemeWeekDrawer from '../../components/ThemeWeekDrawer.vue'
 import PageSkeleton from '../../components/PageSkeleton.vue'
+import {
+  clearFadeDismiss,
+  fadeDismissAgeMs,
+  fadeRenudgeMessage,
+  rememberFadeDismiss,
+  shouldRenudgeFade,
+} from '../../composables/fadeRenudge'
 
 defineOptions({ name: 'ParentMonitorView' })
 
@@ -556,21 +563,40 @@ const insightItems = computed((): InsightItem[] => {
       primary: { label: '去愿望', action: 'wishes', primary: true },
     })
   }
-  if (monitor.rewardFadeHint?.show && !dismissed.has('fade')) {
-    items.push({
-      id: 'fade',
-      chip: '节奏',
-      title: '加分节奏建议',
-      message: monitor.rewardFadeHint.message || '',
-      tone: 'default',
-      primary: {
-        label: `一键试试「${fadeSuggestLabel.value}」`,
-        action: 'applyFade',
-        primary: true,
-        loading: true,
-      },
-      secondary: { label: '去教育设置', action: 'familyEdu' },
-    })
+  if (monitor.rewardFadeHint?.show) {
+    const canRenudge = shouldRenudgeFade()
+    const storedDismiss = fadeDismissAgeMs() != null
+    if (canRenudge && !dismissed.has('fade-renudge')) {
+      items.push({
+        id: 'fade-renudge',
+        chip: '节奏',
+        title: '加分节奏再提醒',
+        message: fadeRenudgeMessage(monitor.rewardFadeHint.message || ''),
+        tone: 'default',
+        primary: {
+          label: `一键试试「${fadeSuggestLabel.value}」`,
+          action: 'applyFade',
+          primary: true,
+          loading: true,
+        },
+        secondary: { label: '去教育设置', action: 'familyEdu' },
+      })
+    } else if (!storedDismiss && !dismissed.has('fade')) {
+      items.push({
+        id: 'fade',
+        chip: '节奏',
+        title: '加分节奏建议',
+        message: monitor.rewardFadeHint.message || '',
+        tone: 'default',
+        primary: {
+          label: `一键试试「${fadeSuggestLabel.value}」`,
+          action: 'applyFade',
+          primary: true,
+          loading: true,
+        },
+        secondary: { label: '去教育设置', action: 'familyEdu' },
+      })
+    }
   }
   if (monitor.parentOverloadHint?.show && !dismissed.has('overload')) {
     items.push({
@@ -722,6 +748,10 @@ watch(
 function dismissInsight(id: string) {
   const next = new Set(dismissedInsights.value)
   next.add(id)
+  if (id === 'fade' || id === 'fade-renudge') {
+    next.add('fade')
+    rememberFadeDismiss()
+  }
   dismissedInsights.value = next
 }
 
@@ -940,6 +970,7 @@ async function applyFadeSuggest() {
     monitor.rewardMode = mode
     monitor.rewardFadeHint = null
     if (monitor.hints) monitor.hints.rewardFadeHint = null
+    clearFadeDismiss()
     ElMessage.success(
       mode === 'weekly_digest'
         ? '已改为周末一起结算：日常先庆祝，周末一起看'

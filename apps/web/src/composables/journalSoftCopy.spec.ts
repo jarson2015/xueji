@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   JOURNAL_COMMENT_PROMPTS,
+  JOURNAL_PARENT_COMMENT_PROMPTS,
   JOURNAL_POST_PROMPTS,
   buildClosePrivateDiaryCopy,
   buildDeleteDiaryCopy,
@@ -10,6 +11,7 @@ import {
   buildShareForceCopy,
   buildShareLayer1Copy,
   buildShareLayer2Copy,
+  journalCommentPromptsForRole,
   shareCopyAssertsNoPrivateLeak,
 } from './journalSoftCopy'
 
@@ -75,5 +77,20 @@ describe('journalSoftCopy', () => {
     expect(JOURNAL_POST_PROMPTS.length).toBeGreaterThan(0)
     expect(JOURNAL_COMMENT_PROMPTS).toContain('看见你了')
     expect(buildProxyComposeHint()).toContain('孩子名下')
+  })
+
+  it('家长回应芯片偏情绪教练，学生保留原芯片', () => {
+    expect(JOURNAL_PARENT_COMMENT_PROMPTS).toContain('听起来你有点…')
+    expect(JOURNAL_PARENT_COMMENT_PROMPTS).toContain('我在，不着急')
+    expect(JOURNAL_PARENT_COMMENT_PROMPTS.join('')).not.toMatch(/真棒|完成了/)
+    expect(journalCommentPromptsForRole('parent')).toEqual(
+      JOURNAL_PARENT_COMMENT_PROMPTS,
+    )
+    expect(journalCommentPromptsForRole('student')).toEqual(
+      JOURNAL_COMMENT_PROMPTS,
+    )
+    expect(journalCommentPromptsForRole(undefined)).toEqual(
+      JOURNAL_COMMENT_PROMPTS,
+    )
   })
 })

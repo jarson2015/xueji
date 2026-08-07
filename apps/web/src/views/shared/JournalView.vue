@@ -589,7 +589,6 @@ import { MOOD_OPTIONS } from '../../composables/eduMood'
 import { useAuthStore } from '../../stores/auth'
 import { friendlyError } from '../../composables/useOnboarding'
 import {
-  JOURNAL_COMMENT_PROMPTS,
   JOURNAL_POST_PROMPTS,
   buildClosePrivateDiaryCopy,
   buildDeleteCommentCopy,
@@ -599,6 +598,7 @@ import {
   buildProxyComposeHint,
   buildShareForceCopy,
   buildShareLayer1Copy,
+  journalCommentPromptsForRole,
 } from '../../composables/journalSoftCopy'
 
 const PAGE_SIZE = 30
@@ -733,7 +733,9 @@ const pendingShareDiary = ref<any>(null)
 
 const moodOptions = MOOD_OPTIONS
 const postPrompts = JOURNAL_POST_PROMPTS
-const commentPrompts = JOURNAL_COMMENT_PROMPTS
+const commentPrompts = computed(() =>
+  journalCommentPromptsForRole(auth.user?.role),
+)
 
 function moodLabel(tag?: string | null) {
   if (!tag) return ''

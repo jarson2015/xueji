@@ -152,13 +152,32 @@ export const JOURNAL_POST_PROMPTS = [
   '谢谢家人帮我…',
 ] as const
 
-/** 回应可选话术 */
+/** 学生回应：温暖陪伴 */
 export const JOURNAL_COMMENT_PROMPTS = [
   '看见你了',
   '辛苦了',
   '我们一起慢慢来',
   '为你开心',
 ] as const
+
+/**
+ * 家长回应：情绪教练脚手架（感受—好奇—陪伴）
+ * 刻意避免「又完成了真棒」类绩效夸
+ */
+export const JOURNAL_PARENT_COMMENT_PROMPTS = [
+  '听起来你有点…',
+  '愿意多说一点吗？',
+  '我在，不着急',
+  '谢谢你告诉我',
+] as const
+
+export function journalCommentPromptsForRole(
+  role: 'parent' | 'student' | string | undefined,
+): readonly string[] {
+  return role === 'parent'
+    ? JOURNAL_PARENT_COMMENT_PROMPTS
+    : JOURNAL_COMMENT_PROMPTS
+}
 
 export function shareCopyAssertsNoPrivateLeak(layer1: SoftCopy, layer2: SoftCopy): boolean {
   const blob = `${layer1.message}${layer2.message}`

@@ -1,13 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, MoreThanOrEqual, Repository } from 'typeorm';
 import {
   StudentDailyFocus,
   StudentWeeklyGoal,
 } from '../entities/student-prefs.entity';
 import { StudentWeeklyReview } from '../entities/student-weekly-review.entity';
 import { JournalPost } from '../entities/journal.entity';
+import { CheckIn } from '../entities/checkin.entity';
+import { TaskAssign } from '../entities/task-assign.entity';
 import { formatDate } from '../common/date-util';
+import { buildWeekendPatternHint } from '../common/weekend-pattern-hint';
 import {
   isValidThemePreset,
   resolveThemeTitle,
@@ -23,6 +26,14 @@ export function isoWeekKey(d = new Date()): string {
     ((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
   );
   return `${tmp.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+function startOfIsoWeekLocal(d = new Date()): Date {
+  const day = d.getDay() || 7;
+  const monday = new Date(d);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(d.getDate() - day + 1);
+  return monday;
 }
 
 export type WeeklyGoalDto = {
@@ -43,6 +54,10 @@ export class StudentPrefsService {
     private readonly weeklyReviews: Repository<StudentWeeklyReview>,
     @InjectRepository(JournalPost)
     private readonly journalPosts: Repository<JournalPost>,
+    @InjectRepository(CheckIn)
+    private readonly checkins: Repository<CheckIn>,
+    @InjectRepository(TaskAssign)
+    private readonly assigns: Repository<TaskAssign>,
   ) {}
 
   private toWeeklyGoalDto(
@@ -226,6 +241,7 @@ export class StudentPrefsService {
     const row = await this.weeklyReviews.findOne({
       where: { studentId, weekKey: week },
     });
+    const weekPatternHint = await this.buildWeekPatternHintForStudent(studentId);
     return {
       weekKey: week,
       proudText: row?.proudText || '',
@@ -233,7 +249,49 @@ export class StudentPrefsService {
       promiseText: row?.promiseText || '',
       journalPostId: row?.journalPostId ?? null,
       journalPostSummary: row?.journalPostSummary || null,
+      weekPatternHint,
     };
+  }
+
+  /** 本周模式一句：缓做 / 情绪 / 反思 / 说说 */
+  async buildWeekPatternHintForStudent(studentId: number): Promise<string | null> {
+    const weekStart = startOfIsoWeekLocal();
+    const weekStartKey = formatDate(weekStart);
+    const checkins = await this.checkins.find({
+      where: {
+        studentId,
+        createdAt: MoreThanOrEqual(weekStart),
+      },
+      take: 80,
+      order: { id: 'DESC' },
+    });
+    let moodTiredOrHard = 0;
+    let reflectionCount = 0;
+    for (const c of checkins) {
+      const mood = (c.moodTag || '').toLowerCase();
+      if (mood === 'tired' || mood === 'hard') {
+        moodTiredOrHard += 1;
+      }
+      if ((c.reflectionText || '').trim()) reflectionCount += 1;
+    }
+    const deferred = await this.assigns
+      .createQueryBuilder('a')
+      .where('a.student_id = :sid', { sid: studentId })
+      .andWhere('a.skip_date IS NOT NULL')
+      .andWhere('a.skip_date >= :wk', { wk: weekStartKey })
+      .getCount();
+    const journalWeekCount = await this.journalPosts
+      .createQueryBuilder('p')
+      .where('p.author_id = :sid', { sid: studentId })
+      .andWhere('p.status = :st', { st: 'active' })
+      .andWhere('p.created_at >= :ws', { ws: weekStart })
+      .getCount();
+    return buildWeekendPatternHint({
+      deferCount: deferred,
+      moodTiredOrHard,
+      reflectionCount,
+      journalWeekCount,
+    });
   }
 
   /** 一次查出多名孩子本周回顾（仪式屏等） */

@@ -32,6 +32,11 @@
         {{ weekendHint }}
       </div>
 
+      <div v-if="weekPatternHint" class="card-panel pattern-hint" role="status">
+        <strong>本周模式</strong>
+        <p class="muted tiny" style="margin: 6px 0 0">{{ weekPatternHint }}</p>
+      </div>
+
       <div v-if="weekThemeLine" class="card-panel theme-banner" role="status">
         <div class="theme-banner-head">
           <strong>{{ weekThemeLine }}</strong>
@@ -87,9 +92,36 @@
           :class="{ active: wizardStep === i - 1, done: wizardStep > i - 1 }"
           :aria-current="wizardStep === i - 1 ? 'step' : undefined"
           :aria-label="`第 ${i} 步`"
-          @click="wizardStep = (i - 1) as 0 | 1 | 2"
+          @click="goStep((i - 1) as 0 | 1 | 2)"
         />
         <span class="muted tiny progress-label">{{ wizardStep + 1 }}/3</span>
+      </div>
+
+      <div class="ritual-timer card-panel" role="group" aria-label="本步计时">
+        <span class="muted tiny">本步建议 {{ stepMinutes }} 分钟（可选）</span>
+        <strong class="timer-digits">{{ timerLabel }}</strong>
+        <div class="timer-actions">
+          <el-button
+            v-if="!timerRunning"
+            type="primary"
+            class="tap-btn"
+            size="small"
+            @click="startStepTimer"
+          >
+            开始计时
+          </el-button>
+          <el-button
+            v-else
+            class="tap-btn"
+            size="small"
+            @click="stopStepTimer"
+          >
+            暂停
+          </el-button>
+          <el-button class="tap-btn" size="small" @click="resetStepTimer">
+            重置
+          </el-button>
+        </div>
       </div>
 
       <div v-show="wizardStep === 0" class="card-panel step-card">
@@ -191,7 +223,7 @@
           v-if="wizardStep > 0"
           class="tap-btn"
           size="large"
-          @click="wizardStep = (wizardStep - 1) as 0 | 1 | 2"
+          @click="goStep((wizardStep - 1) as 0 | 1 | 2)"
         >
           上一步
         </el-button>
@@ -200,7 +232,7 @@
           type="primary"
           class="tap-btn"
           size="large"
-          @click="wizardStep = (wizardStep + 1) as 0 | 1 | 2"
+          @click="goStep((wizardStep + 1) as 0 | 1 | 2)"
         >
           下一步
         </el-button>
@@ -221,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../../api/http'
 import { useAuthStore } from '../../stores/auth'
@@ -232,6 +264,10 @@ import ThemeWeekDrawer from '../../components/ThemeWeekDrawer.vue'
 import { useRouter } from 'vue-router'
 import { suggestionsForThemePreset } from '../../composables/themeWeek'
 import { journalProductName } from '../../composables/journalLabels'
+import {
+  WEEKEND_STEP_SECONDS,
+  formatRitualCountdown,
+} from '../../composables/weekendRitual'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -258,6 +294,15 @@ const weekThemeText = ref('')
 const weekThemePreset = ref('')
 const themeDrawer = ref(false)
 const citeGone = ref(false)
+const weekPatternHint = ref('')
+const timerLeft = ref(WEEKEND_STEP_SECONDS[0])
+const timerRunning = ref(false)
+let timerHandle: ReturnType<typeof setInterval> | null = null
+
+const stepMinutes = computed(() =>
+  Math.round(WEEKEND_STEP_SECONDS[wizardStep.value] / 60),
+)
+const timerLabel = computed(() => formatRitualCountdown(timerLeft.value))
 
 const citedSummary = computed(() => {
   if (!form.journalPostId && !form.journalPostSummary) return ''
@@ -281,6 +326,41 @@ const weekThemeLine = computed(() => {
 const changeSuggests = computed(() =>
   suggestionsForThemePreset(weekThemePreset.value).slice(0, 3),
 )
+
+function stopStepTimer() {
+  timerRunning.value = false
+  if (timerHandle) {
+    clearInterval(timerHandle)
+    timerHandle = null
+  }
+}
+
+function resetStepTimer() {
+  stopStepTimer()
+  timerLeft.value = WEEKEND_STEP_SECONDS[wizardStep.value]
+}
+
+function startStepTimer() {
+  stopStepTimer()
+  if (timerLeft.value <= 0) {
+    timerLeft.value = WEEKEND_STEP_SECONDS[wizardStep.value]
+  }
+  timerRunning.value = true
+  timerHandle = setInterval(() => {
+    if (timerLeft.value <= 1) {
+      timerLeft.value = 0
+      stopStepTimer()
+      ElMessage.success('本步时间到啦，可以轻轻收尾')
+      return
+    }
+    timerLeft.value -= 1
+  }, 1000)
+}
+
+function goStep(step: 0 | 1 | 2) {
+  wizardStep.value = step
+  resetStepTimer()
+}
 
 function goPortfolio() {
   const base = isParent.value ? '/parent/growth' : '/student/growth'
@@ -413,6 +493,7 @@ async function load() {
     form.promiseText = res.promiseText || ''
     form.journalPostId = res.journalPostId ?? null
     form.journalPostSummary = res.journalPostSummary || null
+    weekPatternHint.value = (res.weekPatternHint || '').trim()
     await probeCitedPost()
   } catch (e: any) {
     ElMessage.error(friendlyError(e, '小会记录暂时打不开'))
@@ -452,7 +533,10 @@ async function save() {
 onMounted(async () => {
   if (isParent.value) await loadStudents()
   await load()
+  resetStepTimer()
 })
+
+onUnmounted(() => stopStepTimer())
 </script>
 
 <style scoped>
@@ -463,6 +547,27 @@ onMounted(async () => {
   border-color: rgba(100, 80, 160, 0.22);
   background: linear-gradient(160deg, #f8f5ff 0%, #fff 85%);
   margin-bottom: 14px;
+}
+.pattern-hint {
+  margin-bottom: 14px;
+}
+.ritual-timer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+}
+.timer-digits {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  min-width: 3.5rem;
+}
+.timer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
 }
 .theme-banner {
   margin-bottom: 14px;
