@@ -1,6 +1,4 @@
 import {
-  ConnectedSocket,
-  MessageBody,
   OnGatewayConnection,
   SubscribeMessage,
   WebSocketGateway,
@@ -10,9 +8,14 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { resolveJwtSecret } from '../common/jwt-secret';
 import { resolveCorsOrigin } from '../common/cors-origin';
 import { MonitorRevisionService } from '../common/monitor-revision.service';
+import { User } from '../entities/user.entity';
+import { UserRole } from '../common/enums';
+import { studentSessionEpochOk } from '../common/session-epoch';
 
 @WebSocketGateway({
   cors: {
@@ -38,6 +41,7 @@ export class EventsGateway implements OnGatewayConnection {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly monitorRev: MonitorRevisionService,
+    @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -47,15 +51,40 @@ export class EventsGateway implements OnGatewayConnection {
         client.disconnect();
         return;
       }
-      const payload = await this.jwt.verifyAsync(token, {
+      const payload = await this.jwt.verifyAsync<{
+        sub: number;
+        role?: string;
+        proxy?: boolean;
+        pe?: number;
+      }>(token, {
         secret: resolveJwtSecret(this.config.get<string>('JWT_SECRET')),
       });
-      client.data.user = payload;
-      if (payload.role === 'parent') {
-        client.join(`parent:${payload.sub}`);
+      const user = await this.users.findOne({ where: { id: payload.sub } });
+      if (!user) {
+        client.disconnect();
+        return;
       }
-      if (payload.role === 'student') {
-        client.join(`student:${payload.sub}`);
+      // Students: pe must match proxyEpoch (code / password / proxy)
+      if (user.role === UserRole.STUDENT) {
+        if (!studentSessionEpochOk(payload.pe, user.proxyEpoch)) {
+          client.disconnect();
+          return;
+        }
+      } else if (payload.proxy) {
+        client.disconnect();
+        return;
+      }
+      // Room membership follows DB role, not forged JWT role claim
+      client.data.user = {
+        sub: user.id,
+        role: user.role,
+        proxy: !!payload.proxy && user.role === UserRole.STUDENT,
+      };
+      if (user.role === UserRole.PARENT) {
+        client.join(`parent:${user.id}`);
+      }
+      if (user.role === UserRole.STUDENT) {
+        client.join(`student:${user.id}`);
       }
     } catch (e) {
       this.logger.warn(`WS auth failed: ${e}`);
@@ -74,8 +103,9 @@ export class EventsGateway implements OnGatewayConnection {
     this.server?.to(`student:${studentId}`).emit(event, data);
   }
 
+  /** Ignore client body — avoid WS echo amplification. */
   @SubscribeMessage('ping')
-  ping(@ConnectedSocket() client: Socket, @MessageBody() body: any) {
-    return { event: 'pong', data: body };
+  ping() {
+    return { event: 'pong', data: { ok: true } };
   }
 }

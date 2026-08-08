@@ -30,7 +30,7 @@ async function main() {
   });
   const byCode = await req('/auth/login-code', {
     method: 'POST',
-    body: JSON.stringify({ code: '102938' }),
+    body: JSON.stringify({ code: '10293847' }),
   });
   if (byCode.user?.name !== '小明') throw new Error('login-code name mismatch');
 
@@ -316,7 +316,7 @@ async function main() {
 
   const hong = await req('/auth/login-code', {
     method: 'POST',
-    body: JSON.stringify({ code: '203847' }),
+    body: JSON.stringify({ code: '20384756' }),
   });
   const hh = { Authorization: `Bearer ${hong.accessToken}` };
   const siblings = await req('/pacts/siblings', { headers: sh });

@@ -28,11 +28,17 @@ function privateShort(ageBand?: string): string {
 
 export function buildEnablePrivateDiaryCopy(ageBand?: string): SoftCopy {
   const name = privateShort(ageBand)
+  const teenExtra =
+    ageBand === 'teen'
+      ? '少年阶段更建议留给自己：不必用来交差或换积分。'
+      : ''
   return {
     title: `自愿开启${name}`,
     message:
       `${name}只有你本人能看、能写。家长和其他家人看不到原文；代登家长也不能打开。` +
-      '你随时可以只在自己这边写，不必分享。确定自愿开启吗？',
+      '你随时可以只在自己这边写，不必分享。' +
+      teenExtra +
+      '确定自愿开启吗？',
     confirmText: '自愿开启',
     cancelText: '再想想',
   }
@@ -140,8 +146,15 @@ export function buildShareForceCopy(opts?: JournalSoftOpts): SoftCopy {
   }
 }
 
-export function buildProxyComposeHint(): string {
-  return '代登发言会记在当前孩子名下。'
+export function buildProxyComposeHint(ageBand?: string): string {
+  const base =
+    '代登发言会记在当前孩子名下。家长代写不等于孩子本人表达。私密日记代登不能读写。'
+  if (ageBand === 'teen') {
+    return (
+      base + '少年阶段请尽量让本人自己写；需要确认时再轻轻问一句，而不是替他说完。'
+    )
+  }
+  return base
 }
 
 /** 发帖可选话术（非强制） */
@@ -151,6 +164,9 @@ export const JOURNAL_POST_PROMPTS = [
   '今天有点难，但…',
   '谢谢家人帮我…',
 ] as const
+
+import type { EmotionFunctionKind } from './emotionFunctionHint'
+import { chipsForEmotionFunction } from './emotionFunctionHint'
 
 /** 学生回应：温暖陪伴 */
 export const JOURNAL_COMMENT_PROMPTS = [
@@ -173,10 +189,22 @@ export const JOURNAL_PARENT_COMMENT_PROMPTS = [
 
 export function journalCommentPromptsForRole(
   role: 'parent' | 'student' | string | undefined,
+  emotionKind?: EmotionFunctionKind | null,
 ): readonly string[] {
-  return role === 'parent'
-    ? JOURNAL_PARENT_COMMENT_PROMPTS
-    : JOURNAL_COMMENT_PROMPTS
+  if (role !== 'parent') return JOURNAL_COMMENT_PROMPTS
+  const extra = chipsForEmotionFunction(emotionKind)
+  if (!extra.length) return JOURNAL_PARENT_COMMENT_PROMPTS
+  // 情绪类芯片优先，再补默认教练句，去重后最多 4 条
+  const merged = [...extra, ...JOURNAL_PARENT_COMMENT_PROMPTS]
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const c of merged) {
+    if (seen.has(c)) continue
+    seen.add(c)
+    out.push(c)
+    if (out.length >= 4) break
+  }
+  return out
 }
 
 export function shareCopyAssertsNoPrivateLeak(layer1: SoftCopy, layer2: SoftCopy): boolean {

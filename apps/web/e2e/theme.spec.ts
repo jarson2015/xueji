@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 
 const PARENT_USER = process.env.E2E_PARENT_USER || 'parent@demo.com'
 const PARENT_PASS = process.env.E2E_PARENT_PASS || 'demo1234'
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page) {
   await page.goto('/login')
@@ -24,7 +24,7 @@ async function dismissStudentGuide(page: Page) {
   }
 }
 
-test.describe('学迹主题周抽样', () => {
+test.describe('学迹主题周抽�?, () => {
   test('学生今日可打开本周主题抽屉并见预设', async ({ page }) => {
     await clearSession(page)
     await page.getByRole('button', { name: '学生进入' }).click()
@@ -35,8 +35,8 @@ test.describe('学迹主题周抽样', () => {
     await expect(page.locator('.weekly-goal')).toBeVisible()
     await page.locator('.weekly-goal').getByRole('button', { name: /定一个|去改/ }).click()
     await expect(page.getByRole('button', { name: '保存本周主题' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '小整理' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '先不定' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '小整�? })).toBeVisible()
+    await expect(page.getByRole('button', { name: '先不�? })).toBeVisible()
   })
 
   test('家长看板孩子卡可打开主题抽屉', async ({ page }) => {
@@ -51,8 +51,8 @@ test.describe('学迹主题周抽样', () => {
     await expect(themeRow).toBeVisible({ timeout: 15_000 })
     await themeRow.click()
     await expect(page.getByRole('button', { name: '保存本周主题' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '准时开始' })).toBeVisible()
-    await page.getByRole('button', { name: '小整理' }).click()
+    await expect(page.getByRole('button', { name: '准时开�? })).toBeVisible()
+    await page.getByRole('button', { name: '小整�? }).click()
     await expect(
       page.getByText(/点一下打开发布页并预填标题/),
     ).toBeVisible()

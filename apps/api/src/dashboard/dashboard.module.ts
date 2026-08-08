@@ -13,7 +13,6 @@ import { PlansModule } from '../plans/plans.module';
 import { ProgressExtrasModule } from '../common/progress-extras.module';
 import { FamilyModule } from '../family/family.module';
 import { PactsModule } from '../pacts/pacts.module';
-import { PointsModule } from '../points/points.module';
 import { EventsModule } from '../events/events.module';
 
 @Module({
@@ -31,7 +30,6 @@ import { EventsModule } from '../events/events.module';
     ProgressExtrasModule,
     FamilyModule,
     forwardRef(() => PactsModule),
-    PointsModule,
     EventsModule,
   ],
   providers: [DashboardService],

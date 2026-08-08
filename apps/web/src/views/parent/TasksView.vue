@@ -15,6 +15,7 @@
       <p class="muted tiny-hint" style="margin: 6px 0 0">{{ firstWeekMicroHint }}</p>
     </div>
 
+    <p v-if="taskProposals.length" class="section-label tasks-section-label">待审提议</p>
     <div class="card-panel" v-if="taskProposals.length">
       <h3>孩子想加的小事 <el-tag type="warning" size="small">{{ taskProposals.length }}</el-tag></h3>
       <p class="muted tiny-hint">同意后会成为正式任务并指派给该孩子；拒绝请写一句说明。</p>
@@ -39,6 +40,7 @@
       </div>
     </div>
 
+    <p class="section-label tasks-section-label">已发布</p>
     <div class="tasks-shell" :class="{ 'is-split': useSplitEditor }">
       <div class="tasks-main">
         <!-- P1.1：已发布为主；模板降到列表下方 -->
@@ -61,6 +63,9 @@
               <el-radio-button value="eq">情商</el-radio-button>
             </el-radio-group>
           </div>
+          <p class="muted tiny-hint" style="margin: 8px 0 0">
+            「情商」偏关系与表达；兴趣探索可在发布时勾选，计 0 分。
+          </p>
         </div>
 
         <div v-if="selectedIds.length" class="card-panel batch-bar">
@@ -237,6 +242,7 @@
         </div>
 
         <!-- 系统模板：列表之后；默认折叠 -->
+        <p class="section-label tasks-section-label">从模板添加</p>
         <div ref="templatesRef" class="card-panel templates">
           <button type="button" class="templates-toggle" @click="toggleTemplatesOpen">
             <span class="templates-toggle-main">
@@ -441,6 +447,9 @@ import {
   labelTarget,
 } from '../../composables/taskLabels'
 import { createLoadGate, tryBegin } from '../../composables/asyncGuard'
+import {
+  INTEREST_SUGGESTED_POINTS,
+} from '../../composables/eduRelationCopy'
 import { suggestionsForThemePreset } from '../../composables/themeWeek'
 
 defineOptions({ name: 'ParentTasksView' })
@@ -935,6 +944,16 @@ watch(
   },
 )
 
+/** E1.4：兴趣探索建议 0 分（可改回） */
+watch(
+  () => form.isInterest,
+  (on) => {
+    if (on && form.pointsReward > 0) {
+      form.pointsReward = INTEREST_SUGGESTED_POINTS
+    }
+  },
+)
+
 watch(
   () => form.sharedComplete,
   (shared) => {
@@ -1109,9 +1128,20 @@ function openCreate() {
   }
 }
 
-function openEdit(t: any) {
+async function openEdit(t: any) {
   editingId.value = t.id
-  const sortedSteps = [...(t.steps || [])].sort(
+  let steps = t.steps || []
+  // 列表不再带 steps；编辑时按需拉取
+  if (!steps.length) {
+    try {
+      const full: any = await http.get(`/tasks/${t.id}`)
+      steps = full?.steps || []
+      t.steps = steps
+    } catch {
+      /* keep empty */
+    }
+  }
+  const sortedSteps = [...steps].sort(
     (a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
   )
   Object.assign(form, {
@@ -1426,6 +1456,17 @@ watch(
 </script>
 
 <style scoped>
+.tasks-section-label {
+  margin: 16px 0 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent-strong, #1f4d36);
+  text-transform: none;
+}
+.tasks-section-label:first-of-type {
+  margin-top: 8px;
+}
 .tasks-shell.is-split {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);

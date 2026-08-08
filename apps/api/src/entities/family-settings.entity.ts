@@ -96,6 +96,22 @@ export class FamilySettings {
   @Column({ name: 'allowance_note', type: 'text', nullable: true })
   allowanceNote: string | null;
 
+  /** V1.5：允许成就奖金入零花钱（默认关） */
+  @Column({
+    name: 'allowance_achievement_bonus_enabled',
+    type: 'boolean',
+    default: false,
+  })
+  allowanceAchievementBonusEnabled: boolean;
+
+  /** 单笔成就奖金上限（分），默认 ¥200 */
+  @Column({
+    name: 'allowance_achievement_bonus_max_cents',
+    type: 'int',
+    default: 20000,
+  })
+  allowanceAchievementBonusMaxCents: number;
+
   /** 兄妹积分约定（默认关；积分不是钱） */
   @Column({ name: 'points_pact_enabled', type: 'boolean', default: false })
   pointsPactEnabled: boolean;

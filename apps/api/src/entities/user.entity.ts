@@ -33,11 +33,35 @@ export class User {
   @Column({ name: 'points_balance', type: 'int', default: 0 })
   pointsBalance: number;
 
-  @Column({ name: 'login_code', type: 'varchar', length: 6, nullable: true, unique: true })
+  /**
+   * Legacy plaintext column — kept nullable for migration only.
+   * New codes are stored as loginCodeHash; plaintext is returned once on create/refresh.
+   */
+  @Column({ name: 'login_code', type: 'varchar', length: 16, nullable: true })
   loginCode: string | null;
+
+  @Column({
+    name: 'login_code_hash',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+    unique: true,
+  })
+  loginCodeHash: string | null;
+
+  /** Last 2 digits for parent UI reminder (not enough to log in alone). */
+  @Column({ name: 'login_code_hint', type: 'varchar', length: 2, nullable: true })
+  loginCodeHint: string | null;
 
   @Column({ name: 'login_code_expires_at', type: 'datetime', nullable: true })
   loginCodeExpiresAt: Date | null;
+
+  /**
+   * Student session epoch: bumped on login-code refresh and password change.
+   * Embedded in JWT as `pe` for code / password / proxy; mismatch → 401.
+   */
+  @Column({ name: 'proxy_epoch', type: 'int', default: 0 })
+  proxyEpoch: number;
 
   /** 家里排行：1=大孩；越小越年长；null=未设置（公平提示用创建时间近似） */
   @Column({ name: 'birth_order', type: 'int', nullable: true })

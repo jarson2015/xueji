@@ -77,6 +77,8 @@ describe('journalSoftCopy', () => {
     expect(JOURNAL_POST_PROMPTS.length).toBeGreaterThan(0)
     expect(JOURNAL_COMMENT_PROMPTS).toContain('看见你了')
     expect(buildProxyComposeHint()).toContain('孩子名下')
+    expect(buildProxyComposeHint('teen')).toContain('本人自己写')
+    expect(buildEnablePrivateDiaryCopy('teen').message).toContain('少年阶段')
   })
 
   it('家长回应芯片偏情绪教练，学生保留原芯片', () => {
@@ -92,5 +94,8 @@ describe('journalSoftCopy', () => {
     expect(journalCommentPromptsForRole(undefined)).toEqual(
       JOURNAL_COMMENT_PROMPTS,
     )
+    const exhausted = journalCommentPromptsForRole('parent', 'exhaustion')
+    expect(exhausted[0]).toContain('歇')
+    expect(exhausted.length).toBeLessThanOrEqual(4)
   })
 })

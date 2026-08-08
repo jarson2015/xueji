@@ -9,6 +9,7 @@ import { StudentWeeklyReview } from '../entities/student-weekly-review.entity';
 import { JournalPost } from '../entities/journal.entity';
 import { CheckIn } from '../entities/checkin.entity';
 import { TaskAssign } from '../entities/task-assign.entity';
+import { ParentStudent } from '../entities/parent-student.entity';
 import { formatDate } from '../common/date-util';
 import { buildWeekendPatternHint } from '../common/weekend-pattern-hint';
 import {
@@ -58,7 +59,39 @@ export class StudentPrefsService {
     private readonly checkins: Repository<CheckIn>,
     @InjectRepository(TaskAssign)
     private readonly assigns: Repository<TaskAssign>,
+    @InjectRepository(ParentStudent)
+    private readonly parentStudents: Repository<ParentStudent>,
   ) {}
+
+  /** 周末小会可引用：本人或同家庭成员的活跃说说 */
+  private async assertJournalCitable(studentId: number, postId: number) {
+    const post = await this.journalPosts.findOne({
+      where: { id: postId, status: 'active' },
+    });
+    if (!post) {
+      throw new BadRequestException('说说不存在或已删除');
+    }
+    if (post.authorId === studentId) return post;
+    const myParents = await this.parentStudents.find({
+      where: { studentId },
+    });
+    const parentIds = myParents.map((l) => l.parentId);
+    if (!parentIds.length) {
+      throw new BadRequestException('只能引用家庭内的说说');
+    }
+    if (parentIds.includes(post.authorId)) return post;
+    const siblings = await this.parentStudents.find({
+      where: { parentId: In(parentIds) },
+    });
+    const familyIds = new Set<number>([
+      ...parentIds,
+      ...siblings.map((l) => l.studentId),
+    ]);
+    if (!familyIds.has(post.authorId)) {
+      throw new BadRequestException('只能引用家庭内的说说');
+    }
+    return post;
+  }
 
   private toWeeklyGoalDto(
     week: string,
@@ -362,15 +395,11 @@ export class StudentPrefsService {
       row.journalPostId = pid;
       if (pid == null) {
         row.journalPostSummary = null;
-      } else if (body.journalPostSummary !== undefined) {
-        row.journalPostSummary = slice(body.journalPostSummary || '') || null;
       } else {
-        const post = await this.journalPosts.findOne({
-          where: { id: pid, status: 'active' },
-        });
-        row.journalPostSummary = post
-          ? slice(post.body || '（附图）') || '（附图）'
-          : slice(body.journalPostSummary || '') || null;
+        const post = await this.assertJournalCitable(studentId, pid);
+        // 摘要以服务端帖文为准，忽略客户端自带他帖摘要
+        row.journalPostSummary =
+          slice(post.body || '（附图）') || '（附图）';
       }
     } else if (body.journalPostSummary !== undefined) {
       row.journalPostSummary = slice(body.journalPostSummary || '') || null;

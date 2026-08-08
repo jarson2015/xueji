@@ -46,15 +46,15 @@ async function freezeLocalDate(page: Page, isoLocal: string) {
 }
 
 test.describe('学迹看板周末小会横幅', () => {
-  test('周五：可见横幅与开小会 / 作品集', async ({ page }) => {
+  test('周五：可见横幅与开小会 / 作品�?, async ({ page }) => {
     await freezeLocalDate(page, '2026-08-07T12:00:00')
     await loginAsParent(page)
     await page.goto('/parent/monitor')
     const banner = page.getByRole('region', { name: '周末小会' })
     await expect(banner).toBeVisible({ timeout: 15_000 })
-    await expect(banner.getByText(/骄傲 · 改一件 · 陪伴/)).toBeVisible()
+    await expect(banner.getByText(/骄傲 · 改一�?· 陪伴/)).toBeVisible()
     await expect(banner.getByRole('button', { name: '开小会' })).toBeVisible()
-    await expect(banner.getByRole('button', { name: '作品集' })).toBeVisible()
+    await expect(banner.getByRole('button', { name: '作品�? })).toBeVisible()
   })
 
   test('周一：不显示周末小会横幅', async ({ page }) => {

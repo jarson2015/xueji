@@ -104,9 +104,19 @@
                 <template v-if="weeklyCents">（{{ formatYuan(weeklyCents) }}）</template>
               </el-button>
               <el-button class="tap-btn" @click="incomeDlg = true">记一笔收入</el-button>
+              <el-button
+                v-if="achievementBonusEnabled"
+                class="tap-btn"
+                @click="openAchievement"
+              >
+                登记成就奖金
+              </el-button>
             </div>
             <p v-if="!weeklyCents" class="muted tip">
               可在「教育设置」填写建议每周零花钱金额。
+            </p>
+            <p v-if="!achievementBonusEnabled" class="muted tip">
+              成就奖金默认关闭；可在教育设置「零花钱约定」中开启。
             </p>
           </div>
           <div class="fold-block">
@@ -187,14 +197,51 @@
       @confirm="confirmReject"
     />
     <SoftPrompt
-      v-model="reconcilePrompt"
-      title="接下来可以这样"
-      message="已告诉孩子先缓缓。最好当面约个时间一起商量，比只留在 App 里更暖。"
+      v-model="achievementPrompt"
+      title="登记成就奖金？"
+      :message="achievementConfirmMsg"
+      confirm-text="确认入账"
+      cancel-text="再想想"
       :show-input="false"
-      confirm-text="知道了"
-      cancel-text="关闭"
-      @confirm="reconcilePrompt = false"
+      @confirm="submitAchievement"
     />
+    <el-drawer
+      v-model="achievementDlg"
+      title="登记成就奖金"
+      :direction="isPhone ? 'btt' : 'rtl'"
+      :size="isPhone ? 'var(--drawer-phone)' : '400px'"
+    >
+      <p class="muted tip">
+        进零花钱，不加任务积分。适合偶尔的额外奖励，不适合每次打卡。
+      </p>
+      <el-form label-position="top">
+        <el-form-item label="成就标题">
+          <el-input v-model="achievementForm.title" maxlength="80" size="large" placeholder="如：期中数学进步" />
+        </el-form-item>
+        <el-form-item label="金额（元）">
+          <el-input-number
+            v-model="achievementForm.yuan"
+            :min="0.01"
+            :max="achievementMaxYuan"
+            :step="1"
+            :precision="2"
+            size="large"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="备注（可选）">
+          <el-input v-model="achievementForm.note" maxlength="200" size="large" />
+        </el-form-item>
+        <el-button
+          type="primary"
+          class="tap-btn full-tap"
+          :loading="submitting"
+          @click="achievementPrompt = true"
+        >
+          下一步确认
+        </el-button>
+      </el-form>
+    </el-drawer>
     </template>
   </div>
 </template>
@@ -232,6 +279,19 @@ const incomeDlg = ref(false)
 const rejectPrompt = ref(false)
 const rejectTarget = ref<any>(null)
 const reconcilePrompt = ref(false)
+const achievementBonusEnabled = ref(false)
+const achievementMaxYuan = ref(200)
+const achievementDlg = ref(false)
+const achievementPrompt = ref(false)
+const achievementForm = reactive({
+  title: '',
+  yuan: 20,
+  note: '',
+})
+const achievementConfirmMsg = computed(
+  () =>
+    `将给「${studentName.value}」发放成就奖金 ${formatYuan(yuanToCents(achievementForm.yuan))}（${achievementForm.title || '未填标题'}）。只进零花钱，不加任务积分。`,
+)
 
 const incomeForm = reactive({
   kind: 'pocket_money',
@@ -289,6 +349,9 @@ async function load() {
     balance.value = res.account?.balanceCents ?? 0
     weeklyCents.value = res.allowanceWeeklyCents ?? null
     savePercent.value = res.allowanceSavePercent ?? 0
+    achievementBonusEnabled.value = !!res.allowanceAchievementBonusEnabled
+    achievementMaxYuan.value =
+      (res.allowanceAchievementBonusMaxCents ?? 20000) / 100
     saveFirstHint.value = res.saveFirstOk
       ? ''
       : res.saveFirstHint || ''
@@ -299,6 +362,38 @@ async function load() {
     ElMessage.error(friendlyError(e, '账本暂时打不开'))
   } finally {
     if (ticket.isCurrent()) loading.value = false
+  }
+}
+
+function openAchievement() {
+  achievementForm.title = ''
+  achievementForm.yuan = Math.min(20, achievementMaxYuan.value)
+  achievementForm.note = ''
+  achievementDlg.value = true
+}
+
+async function submitAchievement() {
+  achievementPrompt.value = false
+  if (!studentId.value || !achievementForm.title.trim()) {
+    ElMessage.warning('请填写成就标题')
+    return
+  }
+  if (!tryBegin(submitting)) return
+  try {
+    const draft: any = await http.post('/allowance/achievements', {
+      studentId: studentId.value,
+      title: achievementForm.title.trim(),
+      note: achievementForm.note.trim() || undefined,
+      amountCents: yuanToCents(achievementForm.yuan),
+    })
+    await http.post(`/allowance/achievements/${draft.id}/post`)
+    ElMessage.success('成就奖金已入账')
+    achievementDlg.value = false
+    await load()
+  } catch (e: any) {
+    ElMessage.error(friendlyError(e, '入账没成功'))
+  } finally {
+    submitting.value = false
   }
 }
 

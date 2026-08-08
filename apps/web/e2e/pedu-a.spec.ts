@@ -86,7 +86,7 @@ async function mockApi(page: Page, opts?: { fade?: boolean }) {
             rewardFadeHint: fade
               ? {
                   show: true,
-                  message: '可以试试「有时加分」',
+                  message: '可以试试「有时加分�?,
                   suggestMode: 'sometimes',
                 }
               : null,
@@ -107,7 +107,7 @@ async function mockApi(page: Page, opts?: { fade?: boolean }) {
               id: 10,
               authorId: 2,
               authorName: '小明',
-              body: '今天练琴有点累',
+              body: '今天练琴有点�?,
               visibility: 'family',
               commentCount: 0,
               canEdit: false,
@@ -167,7 +167,7 @@ async function mockApi(page: Page, opts?: { fade?: boolean }) {
             promiseText: '',
             journalPostId: null,
             journalPostSummary: null,
-            weekPatternHint: '这周缓做用得比较多，节奏可能偏紧。小会里可以只挑一件聊聊。',
+            weekPatternHint: '这周缓做用得比较多，节奏可能偏紧。小会里可以只挑一件聊聊�?,
           },
         }),
       })
@@ -226,42 +226,42 @@ async function mockApi(page: Page, opts?: { fade?: boolean }) {
 }
 
 test.describe('学迹 P-Edu-A 教育打磨', () => {
-  test('家长回应区可见情绪教练芯片', async ({ page }) => {
+  test('家长回应区可见情绪教练芯�?, async ({ page }) => {
     await mockApi(page)
     await seedParent(page)
     await page.goto('/parent/journal')
-    await expect(page.getByText('今天练琴有点累')).toBeVisible({
+    await expect(page.getByText('今天练琴有点�?)).toBeVisible({
       timeout: 15_000,
     })
     await page.getByRole('button', { name: /回应/ }).first().click()
-    await expect(page.getByRole('button', { name: '听起来你有点…' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '我在，不着急' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '听起来你有点�? })).toBeVisible()
+    await expect(page.getByRole('button', { name: '我在，不着�? })).toBeVisible()
     await expect(page.getByRole('button', { name: '看见你了' })).toHaveCount(0)
   })
 
-  test('学生回应区仍为温暖芯片', async ({ page }) => {
+  test('学生回应区仍为温暖芯�?, async ({ page }) => {
     await mockApi(page)
     await seedStudent(page)
     await page.goto('/student/journal')
-    await expect(page.getByText('今天练琴有点累')).toBeVisible({
+    await expect(page.getByText('今天练琴有点�?)).toBeVisible({
       timeout: 15_000,
     })
     await page.getByRole('button', { name: /回应/ }).first().click()
     await expect(page.getByRole('button', { name: '看见你了' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '听起来你有点…' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '听起来你有点�? })).toHaveCount(0)
   })
 
-  test('周末小会：本周模式一句 + 分步计时', async ({ page }) => {
+  test('周末小会：本周模式一�?+ 分步计时', async ({ page }) => {
     await mockApi(page)
     await seedStudent(page)
     await page.goto('/student/weekend-meeting')
     await expect(
-      page.getByText(/这周缓做用得比较多/),
+      page.getByText(/这周缓做用得比较�?),
     ).toBeVisible({ timeout: 15_000 })
     const timer = page.getByRole('group', { name: '本步计时' })
     await expect(timer).toBeVisible()
     await expect(timer.getByText('3:00')).toBeVisible()
-    await timer.getByRole('button', { name: '开始计时' }).click()
+    await timer.getByRole('button', { name: '开始计�? }).click()
     await expect(timer.getByRole('button', { name: '暂停' })).toBeVisible()
   })
 
@@ -276,7 +276,7 @@ test.describe('学迹 P-Edu-A 教育打磨', () => {
     if (await chip.isVisible().catch(() => false)) {
       await chip.click()
     }
-    await expect(sense.getByText('加分节奏再提醒')).toBeVisible()
+    await expect(sense.getByText('加分节奏再提�?)).toBeVisible()
     await expect(sense.getByText(/上次提过加分节奏/)).toBeVisible()
   })
 })

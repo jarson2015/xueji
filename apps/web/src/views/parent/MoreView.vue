@@ -2,7 +2,7 @@
   <div class="page">
     <h2 class="page-title">{{ labels.parentFamily }}</h2>
     <p class="lead muted">
-      愿望、周报与休息约定放在这里；日常请用底部的{{ labels.parentMonitor }}、{{ labels.parentStudents }}、{{ labels.parentTasks }}。
+      回顾与约定在此；日常用底部{{ labels.parentMonitor }} / {{ labels.parentTasks }}。
     </p>
 
     <section class="more-section" aria-labelledby="more-notify">
@@ -192,6 +192,43 @@
       </div>
     </section>
 
+    <!-- U4.4：客厅导航状态露在折叠外，避免误藏 -->
+    <section class="more-section" aria-labelledby="more-living">
+      <h3 id="more-living" class="section-label">客厅</h3>
+      <div class="card-panel living-nav-card">
+        <div class="living-nav-row">
+          <div>
+            <strong>{{ livingNavOn ? LIVING_ROOM_COPY.statusOn : LIVING_ROOM_COPY.statusOff }}</strong>
+            <p class="muted tiny" style="margin: 4px 0 0">{{ LIVING_ROOM_COPY.hint }}</p>
+          </div>
+          <el-button
+            v-if="!livingNavOn"
+            type="primary"
+            class="tap-btn"
+            @click="enableLivingRoom"
+          >
+            {{ LIVING_ROOM_COPY.enable }}
+          </el-button>
+          <el-button v-else class="tap-btn" @click="disableLivingRoom">
+            {{ LIVING_ROOM_COPY.disable }}
+          </el-button>
+        </div>
+      </div>
+      <div
+        class="card-panel link-card ritual-card"
+        role="button"
+        tabindex="0"
+        @click="$router.push('/ritual')"
+        @keydown.enter="$router.push('/ritual')"
+      >
+        <div>
+          <h3>客厅仪式屏</h3>
+          <p class="muted">投屏看今日节奏与周末小会（不是配任务）</p>
+        </div>
+        <span class="arrow">›</span>
+      </div>
+    </section>
+
     <section class="more-section" aria-labelledby="more-other">
       <h3 id="more-other" class="section-label">其它</h3>
       <div
@@ -207,31 +244,56 @@
         </div>
         <span class="arrow">›</span>
       </div>
-      <div
-        class="card-panel link-card ritual-card"
-        role="button"
-        tabindex="0"
-        @click="$router.push('/ritual')"
-        @keydown.enter="$router.push('/ritual')"
-      >
-        <div>
-          <h3>客厅仪式屏</h3>
-          <p class="muted">投到电视上看：自动轮播今日节奏与周末小会（不是配任务）</p>
+      <div class="money-fold more-optional-fold">
+        <button type="button" class="money-fold-toggle" @click="optionalOpen = !optionalOpen">
+          <span>
+            <strong>可选入口</strong>
+            <span class="muted tiny">小贴士 · 减负</span>
+          </span>
+          <span class="muted">{{ optionalOpen ? '收起' : '展开' }}</span>
+        </button>
+        <div v-if="optionalOpen" class="money-fold-body">
+          <div
+            class="card-panel link-card"
+            role="button"
+            tabindex="0"
+            @click="$router.push('/parent/family-edu#edu-tips')"
+            @keydown.enter="$router.push('/parent/family-edu#edu-tips')"
+          >
+            <div>
+              <h3>教育小贴士与自检</h3>
+              <p class="muted">分龄微课 · 关系自检（自愿、不算分）</p>
+            </div>
+            <span class="arrow">›</span>
+          </div>
+          <div
+            class="card-panel link-card"
+            role="button"
+            tabindex="0"
+            @click="helpResourcesOpen = true"
+            @keydown.enter="helpResourcesOpen = true"
+          >
+            <div>
+              <h3>减负与求助</h3>
+              <p class="muted">静态资源 · 非诊疗 · 不会自动报警</p>
+            </div>
+            <span class="arrow">›</span>
+          </div>
         </div>
-        <span class="arrow">›</span>
       </div>
-      <p class="muted tiny tv-mode-hint">
-        {{ LIVING_ROOM_COPY.hint }}
-        <button type="button" class="tv-mode-btn" @click="enableLivingRoom">
-          {{ LIVING_ROOM_COPY.enable }}
-        </button>
-        ·
-        <button type="button" class="tv-mode-btn" @click="disableLivingRoom">
-          {{ LIVING_ROOM_COPY.disable }}
-        </button>
-      </p>
     </section>
   </div>
+
+  <SoftPrompt
+    v-model="helpResourcesOpen"
+    :title="HELP_RESOURCES_TITLE"
+    :message="HELP_RESOURCES_BODY"
+    confirm-text="知道了"
+    cancel-text="关闭"
+    :show-input="false"
+    @confirm="helpResourcesOpen = false"
+    @cancel="helpResourcesOpen = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -242,14 +304,27 @@ import http from '../../api/http'
 import { labels } from '../../composables/labels'
 import { journalProductName } from '../../composables/journalLabels'
 import { useFeatureFlags } from '../../composables/useFeatureFlags'
-import { setTvModeOptIn } from '../../composables/useBreakpoint'
+import { isTvModeOptIn, setTvModeOptIn } from '../../composables/useBreakpoint'
 import { ensurePushSubscription } from '../../composables/useWebPush'
 import { isWeekendRitualDay } from '../../composables/weekendRitualDay'
 import { LIVING_ROOM_COPY } from '../../composables/livingRoomCopy'
+import {
+  HELP_RESOURCES_BODY,
+  HELP_RESOURCES_TITLE,
+} from '../../composables/teenPrivacy'
+import SoftPrompt from '../../components/SoftPrompt.vue'
 
 const router = useRouter()
 const { flags } = useFeatureFlags()
 const moneyOpen = ref(false)
+/** U3.3：小贴士 / 减负默认折叠 */
+const optionalOpen = ref(false)
+const helpResourcesOpen = ref(false)
+const livingNavTick = ref(0)
+const livingNavOn = computed(() => {
+  livingNavTick.value
+  return isTvModeOptIn()
+})
 const pushBusy = ref(false)
 const journalNewReplies = ref(0)
 /** 家长侧固定家庭说说 */
@@ -287,11 +362,13 @@ async function enablePush() {
 
 function enableLivingRoom() {
   setTvModeOptIn(true)
+  livingNavTick.value += 1
   ElMessage.success(LIVING_ROOM_COPY.enabledToast)
 }
 
 function disableLivingRoom() {
   setTvModeOptIn(false)
+  livingNavTick.value += 1
   ElMessage.success(LIVING_ROOM_COPY.disabledToast)
 }
 
@@ -382,21 +459,16 @@ function openFeature(path: string, enabled: boolean) {
 .money-fold-body {
   margin-top: 8px;
 }
-.tv-mode-hint {
-  margin: 8px 4px 0;
-  line-height: 1.5;
-  grid-column: 1 / -1;
+.living-nav-card {
+  border-color: color-mix(in srgb, var(--accent, #2f6f4e) 28%, var(--line));
+  background: linear-gradient(160deg, #f3faf6 0%, #fff 80%);
 }
-.tv-mode-btn {
-  border: none;
-  background: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: var(--accent-strong, #2f6f56);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+.living-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .notify-card {
   display: flex;

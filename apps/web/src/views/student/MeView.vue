@@ -3,11 +3,17 @@
     <PageSkeleton v-if="loading" :rows="4" />
     <template v-else>
     <h2 class="page-title">{{ labels.studentMe }}</h2>
-    <div class="card-panel soft-balance profile">
+    <div
+      class="card-panel soft-balance profile"
+      :class="{ 'balance-quiet': agePack.balanceDeemphasized }"
+    >
       <div class="balance-row">
         <span class="muted">{{ auth.user?.name }} 的{{ pointsUnit }}</span>
         <strong class="balance-num">{{ auth.user?.pointsBalance ?? 0 }}</strong>
       </div>
+      <p v-if="agePack.balanceDeemphasized" class="muted tiny" style="margin: 6px 0 0">
+        数字只是工具，别让它抢戏。
+      </p>
     </div>
 
     <div
@@ -22,104 +28,6 @@
         <p class="muted tiny" style="margin: 4px 0 0">照片、里程碑与本周主题</p>
       </div>
       <span class="arrow">›</span>
-    </div>
-
-    <div class="card-panel">
-      <div class="page-head" style="margin-bottom: 8px">
-        <h3 style="margin: 0">本周主题</h3>
-        <el-button type="primary" class="tap-btn" :loading="goalSaving" @click="saveGoal">
-          保存
-        </el-button>
-      </div>
-      <p class="muted tiny plan-hint">
-        选一个主题 + 一句小目标。会出现在「今日」和周末小会。
-      </p>
-      <div class="theme-chips" style="margin-bottom: 10px">
-        <button
-          v-for="p in THEME_WEEK_PRESETS"
-          :key="p.code"
-          type="button"
-          class="theme-chip"
-          :class="{ on: themePresetDraft === p.code }"
-          @click="onMePickTheme(p.code)"
-        >
-          {{ p.title }}
-        </button>
-      </div>
-      <el-input
-        v-if="themePresetDraft === 'custom'"
-        v-model="themeTitleDraft"
-        maxlength="40"
-        show-word-limit
-        size="large"
-        placeholder="自定义主题标题"
-        style="margin-bottom: 10px"
-      />
-      <el-input
-        v-model="weeklyGoalDraft"
-        maxlength="80"
-        show-word-limit
-        size="large"
-        placeholder="例如：这周把英语阅读坚持五天"
-      />
-    </div>
-
-    <div class="card-panel">
-      <div class="page-head" style="margin-bottom: 8px">
-        <h3 style="margin: 0">我想加一件小事</h3>
-        <el-button
-          type="primary"
-          class="tap-btn"
-          :loading="proposeBusy"
-          :disabled="!proposeTitle.trim()"
-          @click="submitProposal"
-        >
-          交给家长
-        </el-button>
-      </div>
-      <p class="muted tiny plan-hint">
-        自己提一件想练的小事，家长同意后会出现在今日待办。不是立刻生效，是商量。也可在「今日」里提。
-      </p>
-      <div v-if="proposeSuggests.length" class="theme-chips" style="margin-bottom: 10px">
-        <button
-          v-for="s in proposeSuggests"
-          :key="s"
-          type="button"
-          class="theme-chip"
-          @click="proposeTitle = s"
-        >
-          {{ s }}
-        </button>
-      </div>
-      <el-input
-        v-model="proposeTitle"
-        maxlength="120"
-        show-word-limit
-        size="large"
-        placeholder="例如：每天练跳绳 10 分钟"
-        style="margin-bottom: 10px"
-      />
-      <div class="propose-row">
-        <span class="muted tiny">类型</span>
-        <el-radio-group v-model="proposeCategory" size="default">
-          <el-radio-button value="study">学习</el-radio-button>
-          <el-radio-button value="chore">家务</el-radio-button>
-          <el-radio-button value="routine">习惯</el-radio-button>
-        </el-radio-group>
-      </div>
-      <div class="propose-row">
-        <span class="muted tiny">大约多久（可选）</span>
-        <el-input-number v-model="proposeMinutes" :min="5" :max="120" :step="5" size="large" />
-        <span class="muted tiny">分钟；不填表示一次完成</span>
-      </div>
-      <div v-if="myProposals.length" class="my-proposals">
-        <div class="muted tiny" style="margin-top: 12px">我提过的</div>
-        <div v-for="p in myProposals.slice(0, 5)" :key="p.id" class="proposal-status-row">
-          <span>{{ p.title }}</span>
-          <el-tag size="small" :type="proposalTagType(p.status)">{{ proposalStatusLabel(p.status) }}</el-tag>
-          <p v-if="p.status === 'rejected' && p.rejectNote" class="muted tiny">{{ p.rejectNote }}</p>
-        </div>
-      </div>
     </div>
 
     <div class="card-panel plan-main">
@@ -147,6 +55,121 @@
         <EmptyState title="还没有计划" description="点右上角新建一个小计划，给自己加一件今日项。" />
       </div>
     </div>
+
+    <!-- U2.4：与今日重复的主题/加小事收到折叠，首屏留给计划与作品集 -->
+    <el-collapse v-model="meExtrasOpen" class="me-fold me-extras">
+      <el-collapse-item name="theme">
+        <template #title>
+          <span>本周主题</span>
+        </template>
+        <div class="page-head" style="margin-bottom: 8px">
+          <p class="muted tiny plan-hint" style="margin: 0">
+            也会出现在「今日」和周末小会。
+          </p>
+          <el-button type="primary" class="tap-btn" :loading="goalSaving" @click="saveGoal">
+            保存
+          </el-button>
+        </div>
+        <div class="theme-chips" style="margin-bottom: 10px">
+          <button
+            v-for="p in THEME_WEEK_PRESETS"
+            :key="p.code"
+            type="button"
+            class="theme-chip"
+            :class="{ on: themePresetDraft === p.code }"
+            @click="onMePickTheme(p.code)"
+          >
+            {{ p.title }}
+          </button>
+        </div>
+        <el-input
+          v-if="themePresetDraft === 'custom'"
+          v-model="themeTitleDraft"
+          maxlength="40"
+          show-word-limit
+          size="large"
+          placeholder="自定义主题标题"
+          style="margin-bottom: 10px"
+        />
+        <el-input
+          v-model="weeklyGoalDraft"
+          maxlength="80"
+          show-word-limit
+          size="large"
+          placeholder="例如：这周把英语阅读坚持五天"
+        />
+      </el-collapse-item>
+      <el-collapse-item name="propose">
+        <template #title>
+          <span>我想加一件小事</span>
+        </template>
+        <p class="muted tiny plan-hint">
+          家长同意后出现在今日。也可在「今日」里提。
+        </p>
+        <div class="page-head" style="margin-bottom: 8px">
+          <span />
+          <el-button
+            type="primary"
+            class="tap-btn"
+            :loading="proposeBusy"
+            :disabled="!proposeTitle.trim()"
+            @click="submitProposal"
+          >
+            交给家长
+          </el-button>
+        </div>
+        <div v-if="proposeSuggests.length" class="theme-chips" style="margin-bottom: 10px">
+          <button
+            v-for="s in proposeSuggests"
+            :key="s"
+            type="button"
+            class="theme-chip"
+            @click="proposeTitle = s"
+          >
+            {{ s }}
+          </button>
+        </div>
+        <el-input
+          v-model="proposeTitle"
+          maxlength="120"
+          show-word-limit
+          size="large"
+          placeholder="例如：每天练跳绳 10 分钟"
+          style="margin-bottom: 10px"
+        />
+        <div class="propose-row">
+          <span class="muted tiny">类型</span>
+          <el-radio-group v-model="proposeCategory" size="default">
+            <el-radio-button value="study">学习</el-radio-button>
+            <el-radio-button value="chore">家务</el-radio-button>
+            <el-radio-button value="routine">习惯</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="propose-row">
+          <span class="muted tiny">大约多久（可选）</span>
+          <el-input-number
+            v-model="proposeMinutes"
+            :min="5"
+            :max="120"
+            :step="5"
+            size="large"
+          />
+          <span class="muted tiny">分钟；不填表示一次完成</span>
+        </div>
+        <div v-if="myProposals.length" class="my-proposals">
+          <div class="muted tiny" style="margin-top: 12px">我提过的</div>
+          <div v-for="p in myProposals.slice(0, 5)" :key="p.id" class="proposal-status-row">
+            <span>{{ p.title }}</span>
+            <el-tag size="small" :type="proposalTagType(p.status)">{{
+              proposalStatusLabel(p.status)
+            }}</el-tag>
+            <p v-if="p.status === 'rejected' && p.rejectNote" class="muted tiny">
+              {{ p.rejectNote }}
+            </p>
+          </div>
+        </div>
+      </el-collapse-item>
+    </el-collapse>
 
     <el-collapse class="me-fold">
       <el-collapse-item name="week">
@@ -306,6 +329,21 @@
       </el-collapse-item>
     </el-collapse>
 
+    <el-collapse v-if="privateReflections.length" class="me-fold">
+      <el-collapse-item name="private-reflect">
+        <template #title>
+          <span>留给自己的句子</span>
+        </template>
+        <p class="muted tiny plan-hint">{{ PRIVATE_REFLECTIONS_HINT }}</p>
+        <ul class="private-reflect-list">
+          <li v-for="(r, i) in privateReflections" :key="i">
+            <span>{{ r.text }}</span>
+            <span v-if="r.taskTitle" class="muted tiny"> · {{ r.taskTitle }}</span>
+          </li>
+        </ul>
+      </el-collapse-item>
+    </el-collapse>
+
     </template>
 
     <el-dialog v-model="planDlg" title="新建计划" width="90%" style="max-width: 420px">
@@ -336,7 +374,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../../api/http'
 import { useAuthStore } from '../../stores/auth'
@@ -348,6 +386,7 @@ import {
   getFocusVoiceEnabled,
   setFocusVoiceEnabled,
 } from '../../composables/focusPrefs'
+import { getAgeContentPack } from '../../composables/ageContentPack'
 import { pointsUnitLabel } from '../../composables/pointsNarrative'
 import {
   syncWeeklyGoalStateFromServer,
@@ -358,6 +397,10 @@ import {
   suggestionsForThemePreset,
 } from '../../composables/themeWeek'
 import { createLoadGate, tryBegin } from '../../composables/asyncGuard'
+import {
+  PRIVATE_REFLECTIONS_HINT,
+  listPrivateReflections,
+} from '../../composables/teenPrivacy'
 
 const auth = useAuthStore()
 const plans = ref<any[]>([])
@@ -367,8 +410,12 @@ const meLoadGate = createLoadGate()
 const goalSaving = ref(false)
 const selectedDate = ref('')
 const ageBand = ref(localStorage.getItem('ageBand') || 'general')
+const privateReflections = ref(listPrivateReflections())
 const teenMode = computed(() => ageBand.value === 'teen')
+const agePack = computed(() => getAgeContentPack(ageBand.value))
 const pointsUnit = computed(() => pointsUnitLabel(ageBand.value))
+/** U2.4：主题/加小事默认收起 */
+const meExtrasOpen = ref<string[]>([])
 const focusVoiceOn = ref(getFocusVoiceEnabled(ageBand.value))
 const weeklyGoalDraft = ref('')
 const themePresetDraft = ref('')
@@ -600,6 +647,9 @@ async function addItem() {
 }
 
 onMounted(() => load())
+onActivated(() => {
+  privateReflections.value = listPrivateReflections()
+})
 watch(taskSyncTick, () => {
   void load({ soft: true })
 })
@@ -615,6 +665,11 @@ watch(taskSyncTick, () => {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+}
+.balance-quiet .balance-num {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
 }
 .soft-balance .balance-num {
   font-size: 1.35rem;
@@ -682,6 +737,14 @@ watch(taskSyncTick, () => {
   justify-content: space-between;
   gap: 12px;
   min-height: var(--tap-min);
+}
+.private-reflect-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+}
+.private-reflect-list li {
+  margin-bottom: 8px;
 }
 .me-fold {
   margin-bottom: 12px;

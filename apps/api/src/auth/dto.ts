@@ -1,4 +1,4 @@
-import { IsString, Length, MinLength } from 'class-validator';
+import { IsString, Length, Matches, MinLength } from 'class-validator';
 
 export class LoginDto {
   @IsString()
@@ -11,7 +11,8 @@ export class LoginDto {
 
 export class LoginCodeDto {
   @IsString()
-  @Length(6, 6)
+  @Length(6, 8)
+  @Matches(/^\d{6,8}$/, { message: '登录码须为 6～8 位数字' })
   code: string;
 }
 

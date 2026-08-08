@@ -2,14 +2,14 @@ import { test, expect, type Page } from '@playwright/test'
 
 const PARENT_USER = process.env.E2E_PARENT_USER || 'parent@demo.com'
 const PARENT_PASS = process.env.E2E_PARENT_PASS || 'demo1234'
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page) {
   await page.goto('/login')
   await page.evaluate(() => {
     localStorage.clear()
     sessionStorage.clear()
-    // 跳过新手引导，避免遮罩挡住冒烟点击
+    // 跳过新手引导，避免遮罩挡住冒烟点�?
     localStorage.setItem('onboardParentV2', 'done')
     localStorage.setItem('guideParentDone', '1')
     localStorage.setItem('onboardStudentV2', 'done')
@@ -49,19 +49,19 @@ test.describe('学迹 UI 冒烟', () => {
     await expect(page.getByRole('heading', { name: '家庭教育设置' })).toBeVisible()
     await expect(page.locator('#edu-common')).toHaveText('常用')
     await expect(page.locator('#edu-advanced')).toHaveText('进阶')
-    await expect(page.getByRole('heading', { name: '积分与成长' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '积分与成�? })).toBeVisible()
     // 公约默认收起（DOM 可能仍在，以可见性为准）
-    await expect(page.getByText('家庭互助卡说明（孩子可见）')).toBeHidden()
+    await expect(page.getByText('家庭互助卡说明（孩子可见�?)).toBeHidden()
     await page.locator('.el-collapse-item__header', { hasText: '公约文案' }).click()
-    await expect(page.getByText('家庭互助卡说明（孩子可见）')).toBeVisible()
-    const reflection = page.getByText('打卡后反思小问')
+    await expect(page.getByText('家庭互助卡说明（孩子可见�?)).toBeVisible()
+    const reflection = page.getByText('打卡后反思小�?)
     if (await reflection.isHidden()) {
-      await page.locator('.el-collapse-item__header', { hasText: '打卡与确认' }).click()
+      await page.locator('.el-collapse-item__header', { hasText: '打卡与确�? }).click()
     }
     await expect(reflection).toBeVisible()
   })
 
-  test('家长 More：无重复日常三入口卡片', async ({ page }) => {
+  test('家长 More：无重复日常三入口卡�?, async ({ page }) => {
     await loginAsParent(page)
     await page.goto('/parent/more')
     await expect(page.getByRole('heading', { name: '更多设置' })).toBeVisible()

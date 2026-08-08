@@ -30,7 +30,7 @@
 
     <EmptyState
       v-if="loadError && !monitor.children.length"
-      hero
+      tone="error"
       title="看板暂时打不开"
       :description="
         knownHasStudents
@@ -45,7 +45,7 @@
 
     <div
       v-else-if="loadError && monitor.children.length"
-      class="card-panel load-warn"
+      class="card-panel load-warn state-fail"
       role="status"
     >
       <span>摘要刷新没成功，下面仍是刚才的内容。</span>
@@ -62,30 +62,177 @@
     />
 
     <template v-if="monitor.children.length">
-    <!-- Q1 · 行动区：非 TV 待处理置顶 -->
-    <MonitorPendingPanel
+    <!-- U3.1：手机首屏先关系句，再待办；TV 仍总览后待办 -->
+    <div
       v-if="!isTv"
-      variant="phone"
-      :confirms="filteredPendingConfirms"
-      :proposals="filteredPendingProposals"
-      :action-pending-count="actionPendingCount"
-      :selected-confirm-ids="selectedConfirmIds"
-      :batch-busy="batchBusy"
-      :acting-id="actingId"
-      :proposal-busy="proposalBusy"
-      :child-filter-id="childFilterId"
-      :family-confirm-count="monitor.pendingConfirms?.length || 0"
-      :family-proposal-count="monitor.pendingProposals?.length || 0"
-      @toggle-select="toggleConfirmSelect"
-      @batch-approve="batchApproveConfirms"
-      @clear-selection="selectedConfirmIds = []"
-      @approve="approve"
-      @reject="reject"
-      @approve-proposal="openApproveProposal"
-      @reject-proposal="openRejectProposal"
-    />
+      class="card-panel headline-card relation-hero soft-enter"
+    >
+      <p class="headline">{{ displayHeadline }}</p>
+      <p class="muted tiny relation-first-hint">{{ relationHeroSub }}</p>
+      <div class="relation-hero-actions">
+        <el-button
+          v-if="actionPendingCount > 0"
+          type="primary"
+          class="tap-btn"
+          @click="scrollToPending"
+        >
+          处理 {{ actionPendingCount }} 件 ›
+        </el-button>
+        <el-button text type="primary" class="tap-btn" @click="statsOpen = !statsOpen">
+          {{ statsOpen ? '收起今日进度' : '查看今日进度' }}
+        </el-button>
+      </div>
+      <div v-show="statsOpen" class="headline-stats">
+        <div class="headline-top">
+          <div class="stat-num">{{ `${displayTotalDone}/${displayTotalDue || 0}` }}</div>
+          <span v-if="headlineScopeLabel" class="headline-scope muted">
+            {{ headlineScopeLabel }}
+          </span>
+        </div>
+        <div
+          v-if="displayTotalDue > 0"
+          class="progress-block headline-progress"
+          role="progressbar"
+          :aria-valuenow="displayTotalDone"
+          :aria-valuemax="displayTotalDue"
+        >
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: `${headlineProgressPct}%` }" />
+          </div>
+        </div>
+      </div>
+      <el-button
+        v-if="monitor.pactAlert?.total"
+        text
+        type="primary"
+        class="tap-btn"
+        @click="
+          $router.push({
+            path: '/parent/pacts',
+            query: monitor.pactAlert.parentPending ? { focus: 'parent' } : {},
+          })
+        "
+      >
+        查看积分约定
+        <template v-if="monitor.pactAlert.parentPending">
+          （{{ monitor.pactAlert.parentPending }} 待同意）
+        </template>
+      </el-button>
+    </div>
 
-    <MonitorWeekendBanner v-if="!isTv && showWeekendRitualBanner" />
+    <div ref="pendingAnchorRef">
+      <MonitorPendingPanel
+        v-if="!isTv"
+        variant="phone"
+        :confirms="filteredPendingConfirms"
+        :proposals="filteredPendingProposals"
+        :action-pending-count="actionPendingCount"
+        :selected-confirm-ids="selectedConfirmIds"
+        :batch-busy="batchBusy"
+        :acting-id="actingId"
+        :proposal-busy="proposalBusy"
+        :child-filter-id="childFilterId"
+        :family-confirm-count="monitor.pendingConfirms?.length || 0"
+        :family-proposal-count="monitor.pendingProposals?.length || 0"
+        @toggle-select="toggleConfirmSelect"
+        @batch-approve="batchApproveConfirms"
+        @clear-selection="selectedConfirmIds = []"
+        @approve="approve"
+        @reject="reject"
+        @approve-proposal="openApproveProposal"
+        @reject-proposal="openRejectProposal"
+      />
+    </div>
+
+    <!-- U3.1：次级横幅合并；说说 tip 自管可见性，不计入假「更多提示」 -->
+    <div v-if="!isTv && monitorTipCount > 0" class="monitor-tips">
+      <MonitorWeekendBanner v-if="showWeekendRitualBanner && tipPin === 'weekend'" />
+      <div
+        v-else-if="tipPin === 'calendar' && calendarSoftBanner"
+        class="card-panel cal-soft-banner"
+        role="status"
+      >
+        <div class="cal-soft-main">
+          <strong>{{
+            calendarSoftBanner.kind === 'weekend' ? '周末节奏' : '学业高峰提醒'
+          }}</strong>
+          <p class="muted tiny" style="margin: 6px 0 0">{{ calendarSoftBanner.message }}</p>
+        </div>
+        <el-button text type="primary" class="tap-btn" @click="onDismissCalendarSoft">
+          知道了
+        </el-button>
+      </div>
+      <div
+        v-else-if="tipPin === 'emotion' && emotionHintNote"
+        class="card-panel emotion-fn-note"
+        role="status"
+      >
+        <strong>{{ emotionHintNote.label }}</strong>
+        <p class="muted tiny" style="margin: 6px 0 0">{{ emotionHintNote.parentNote }}</p>
+        <p class="muted tiny" style="margin: 4px 0 0">仅供参考，不是评分。</p>
+        <el-button
+          v-if="emotionLessonPath"
+          text
+          type="primary"
+          class="tap-btn"
+          style="margin-top: 4px"
+          @click="$router.push(emotionLessonPath)"
+        >
+          看相关小贴士
+        </el-button>
+      </div>
+
+      <div v-if="monitorTipCount > 1" class="monitor-tips-fold">
+        <button
+          type="button"
+          class="monitor-tips-toggle"
+          @click="monitorTipsOpen = !monitorTipsOpen"
+        >
+          <span>
+            <strong>更多提示</strong>
+            <span class="muted tiny"> · {{ monitorTipCount - 1 }} 条</span>
+          </span>
+          <span class="muted">{{ monitorTipsOpen ? '收起' : '展开' }}</span>
+        </button>
+        <div v-if="monitorTipsOpen" class="monitor-tips-body">
+          <MonitorWeekendBanner v-if="showWeekendRitualBanner && tipPin !== 'weekend'" />
+          <div
+            v-if="calendarSoftBanner && tipPin !== 'calendar'"
+            class="card-panel cal-soft-banner"
+            role="status"
+          >
+            <div class="cal-soft-main">
+              <strong>{{
+                calendarSoftBanner.kind === 'weekend' ? '周末节奏' : '学业高峰提醒'
+              }}</strong>
+              <p class="muted tiny" style="margin: 6px 0 0">{{ calendarSoftBanner.message }}</p>
+            </div>
+            <el-button text type="primary" class="tap-btn" @click="onDismissCalendarSoft">
+              知道了
+            </el-button>
+          </div>
+          <div
+            v-if="emotionHintNote && tipPin !== 'emotion'"
+            class="card-panel emotion-fn-note"
+            role="status"
+          >
+            <strong>{{ emotionHintNote.label }}</strong>
+            <p class="muted tiny" style="margin: 6px 0 0">{{ emotionHintNote.parentNote }}</p>
+            <p class="muted tiny" style="margin: 4px 0 0">仅供参考，不是评分。</p>
+            <el-button
+              v-if="emotionLessonPath"
+              text
+              type="primary"
+              class="tap-btn"
+              style="margin-top: 4px"
+              @click="$router.push(emotionLessonPath)"
+            >
+              看相关小贴士
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
     <JournalSoftTip
       v-if="!isTv"
       journal-path="/parent/journal"
@@ -98,42 +245,24 @@
     >
       <!-- Q1 · 状态区 -->
       <div class="zone-status monitor-main">
-        <div class="card-panel headline-card" :class="{ 'tv-headline': isTv }">
-          <div class="headline-top">
-            <div class="stat-num">{{ `${displayTotalDone}/${displayTotalDue || 0}` }}</div>
-            <span v-if="!isTv && headlineScopeLabel" class="headline-scope muted">
-              {{ headlineScopeLabel }}
-            </span>
-          </div>
-          <div
-            v-if="displayTotalDue > 0"
-            class="progress-block headline-progress"
-            role="progressbar"
-            :aria-valuenow="displayTotalDone"
-            :aria-valuemax="displayTotalDue"
-          >
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: `${headlineProgressPct}%` }" />
+        <div v-if="isTv" class="card-panel headline-card tv-headline">
+          <p class="headline">{{ displayHeadline }}</p>
+          <div class="headline-stats">
+            <div class="headline-top">
+              <div class="stat-num">{{ `${displayTotalDone}/${displayTotalDue || 0}` }}</div>
+            </div>
+            <div
+              v-if="displayTotalDue > 0"
+              class="progress-block headline-progress"
+              role="progressbar"
+              :aria-valuenow="displayTotalDone"
+              :aria-valuemax="displayTotalDue"
+            >
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: `${headlineProgressPct}%` }" />
+              </div>
             </div>
           </div>
-          <p class="headline">{{ displayHeadline }}</p>
-          <el-button
-            v-if="!isTv && monitor.pactAlert?.total"
-            text
-            type="primary"
-            class="tap-btn"
-            @click="
-              $router.push({
-                path: '/parent/pacts',
-                query: monitor.pactAlert.parentPending ? { focus: 'parent' } : {},
-              })
-            "
-          >
-            查看积分约定
-            <template v-if="monitor.pactAlert.parentPending">
-              （{{ monitor.pactAlert.parentPending }} 待同意）
-            </template>
-          </el-button>
         </div>
 
         <!-- TV：总览后展示待处理 -->
@@ -240,6 +369,7 @@
       :require-note="prompt.requireNote"
       :initial-note="prompt.initialNote"
       :hint="prompt.hint"
+      :optional-note="prompt.optionalNote"
       @confirm="onPromptConfirm"
     />
     <SoftPrompt
@@ -250,6 +380,16 @@
       cancel-text="取消"
       :show-input="false"
       @confirm="onBatchApproveConfirm"
+    />
+    <SoftPrompt
+      v-model="helpResourcesOpen"
+      :title="RELIEF_HELP_TITLE"
+      :message="RELIEF_HELP_MESSAGE"
+      confirm-text="知道了"
+      cancel-text="去任务减负"
+      :show-input="false"
+      @confirm="helpResourcesOpen = false"
+      @cancel="onHelpResourcesCancel"
     />
     <SoftStay v-model:message="stayMsg" />
     <ThemeWeekDrawer
@@ -266,7 +406,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  onActivated,
+  onMounted,
+  onUnmounted,
+  reactive,
+  ref,
+  watch,
+} from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http, { getWithMeta } from '../../api/http'
@@ -306,11 +455,19 @@ import type {
   MonitorTodayItem,
 } from '../../types/monitor'
 import EmptyState from '../../components/EmptyState.vue'
-import SoftPrompt from '../../components/SoftPrompt.vue'
-import SoftStay from '../../components/SoftStay.vue'
 import MonitorPendingPanel from '../../components/MonitorPendingPanel.vue'
 import MonitorWeekendBanner from '../../components/MonitorWeekendBanner.vue'
 import JournalSoftTip from '../../components/JournalSoftTip.vue'
+
+const SoftPrompt = defineAsyncComponent(
+  () => import('../../components/SoftPrompt.vue'),
+)
+const SoftStay = defineAsyncComponent(
+  () => import('../../components/SoftStay.vue'),
+)
+const ThemeWeekDrawer = defineAsyncComponent(
+  () => import('../../components/ThemeWeekDrawer.vue'),
+)
 import { isWeekendRitualDay } from '../../composables/weekendRitualDay'
 import {
   MONITOR_OFFLINE_REFRESH_LABEL,
@@ -321,7 +478,6 @@ import MonitorInsightStrip from '../../components/MonitorInsightStrip.vue'
 import MonitorChildCard from '../../components/MonitorChildCard.vue'
 import MonitorFamilyFeed from '../../components/MonitorFamilyFeed.vue'
 import MonitorChildFilter from '../../components/MonitorChildFilter.vue'
-import ThemeWeekDrawer from '../../components/ThemeWeekDrawer.vue'
 import PageSkeleton from '../../components/PageSkeleton.vue'
 import {
   clearFadeDismiss,
@@ -330,6 +486,23 @@ import {
   rememberFadeDismiss,
   shouldRenudgeFade,
 } from '../../composables/fadeRenudge'
+import {
+  RELIEF_HELP_MESSAGE,
+  RELIEF_HELP_TITLE,
+} from '../../composables/eduRelationCopy'
+import { getAgeContentPack } from '../../composables/ageContentPack'
+import {
+  calendarSoftStrategy,
+  classifyEmotionFunction,
+  chipsForEmotionFunction,
+  dismissCalendarSoft,
+  isCalendarSoftDismissed,
+  type EmotionFunctionHint,
+} from '../../composables/emotionFunctionHint'
+import {
+  familyEduLessonPath,
+  lessonIdForEmotionKind,
+} from '../../composables/parentMicroLessons'
 
 defineOptions({ name: 'ParentMonitorView' })
 
@@ -339,6 +512,52 @@ const { isTv, isPhone, isTablet, isDesktop } = useBreakpoint()
 const useMonitorSplit = computed(() => !isTv.value && (isTablet.value || isDesktop.value))
 const senseOpen = ref(false)
 const senseUserTouched = ref(false)
+/** E1.1：非 TV 默认收起完成数字，关系文案优先 */
+const statsOpen = ref(false)
+const helpResourcesOpen = ref(false)
+const calendarSoftTick = ref(0)
+/** U3.1：待办锚点 + 次级提示折叠 */
+const pendingAnchorRef = ref<HTMLElement | null>(null)
+const monitorTipsOpen = ref(false)
+
+function scrollToPending() {
+  pendingAnchorRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const calendarSoftBanner = computed(() => {
+  calendarSoftTick.value
+  const soft = calendarSoftStrategy()
+  if (!soft) return null
+  if (isCalendarSoftDismissed(soft.kind)) return null
+  return soft
+})
+
+function onDismissCalendarSoft() {
+  const soft = calendarSoftStrategy()
+  if (soft) dismissCalendarSoft(soft.kind)
+  calendarSoftTick.value += 1
+}
+
+/** E3：家长旁注（不打分） */
+const emotionHintNote = computed((): EmotionFunctionHint | null => {
+  const hint = classifyEmotionFunction({
+    parentOverload: !!monitor.parentOverloadHint?.show,
+    fairnessHint: !!monitor.fairnessHint?.message,
+    meaningCoach: (monitor.coachInsights || []).length > 0,
+  })
+  if (hint) {
+    try {
+      localStorage.setItem('xueji_emotion_fn_kind', hint.kind)
+    } catch {
+      /* ignore */
+    }
+  }
+  return hint
+})
+const emotionLessonPath = computed(() => {
+  const id = lessonIdForEmotionKind(emotionHintNote.value?.kind)
+  return id ? familyEduLessonPath(id) : null
+})
 const { connected: wsOk, connect, on } = useSocket()
 const showOfflineRefreshTag = computed(() =>
   showMonitorOfflineTag({ isTv: isTv.value, wsConnected: wsOk.value }),
@@ -508,6 +727,7 @@ type InsightAction =
   | 'growth'
   | 'weekendMeeting'
   | 'students'
+  | 'helpResources'
 
 type InsightItem = {
   id: string
@@ -606,7 +826,8 @@ const insightItems = computed((): InsightItem[] => {
       message: monitor.parentOverloadHint.message || '',
       bullets: monitor.parentOverloadHint.suggestions || [],
       tone: 'warn',
-      primary: { label: '去任务清单', action: 'tasks' },
+      primary: { label: '去减任务', action: 'tasks', primary: true },
+      secondary: { label: '求助与减负', action: 'helpResources' },
     })
   }
   if (monitor.fairnessHint?.message && !dismissed.has('fairness')) {
@@ -794,7 +1015,16 @@ function runInsightAction(action: InsightAction) {
   }
   if (action === 'pactsGift') {
     router.push({ path: '/parent/pacts', query: { tab: 'gift' } })
+    return
   }
+  if (action === 'helpResources') {
+    helpResourcesOpen.value = true
+  }
+}
+
+function onHelpResourcesCancel() {
+  helpResourcesOpen.value = false
+  router.push('/parent/tasks')
 }
 
 /** P1.1：2 孩起显示筛选 */
@@ -826,6 +1056,30 @@ const actionPendingCount = computed(
 
 /** 周五–日：看板轻触达周末小会（不依赖洞察是否展开） */
 const showWeekendRitualBanner = computed(() => isWeekendRitualDay())
+
+/** U3.1：提示优先级 weekend > calendar > emotion（说说 tip 自管可见性） */
+const tipPin = computed((): 'weekend' | 'calendar' | 'emotion' | null => {
+  if (showWeekendRitualBanner.value) return 'weekend'
+  if (calendarSoftBanner.value) return 'calendar'
+  if (emotionHintNote.value) return 'emotion'
+  return null
+})
+
+const monitorTipCount = computed(() => {
+  let n = 0
+  if (showWeekendRitualBanner.value) n += 1
+  if (calendarSoftBanner.value) n += 1
+  if (emotionHintNote.value) n += 1
+  return n
+})
+
+const relationHeroSub = computed(() => {
+  if (actionPendingCount.value > 0) {
+    return '先看见节奏，再处理下面的确认与提议。'
+  }
+  if (showWeekendRitualBanner.value) return '周末适合一起看看节奏，而不是只盯完成率。'
+  return '先看见节奏与关系；完成数字默认收起。'
+})
 
 const PROPOSAL_POINT_TEMPLATES = ['5 分（推荐）', '10 分', '先不计分']
 const PROPOSAL_REJECT_TEMPLATES = [
@@ -999,6 +1253,8 @@ const prompt = reactive({
   requireNote: false,
   initialNote: '',
   hint: '',
+  /** U3.2：较长说明进 SoftPrompt「可选说明」 */
+  optionalNote: '',
 })
 
 /** P4：页级统一家庭动态（随筛选联动） */
@@ -1041,6 +1297,14 @@ const APPROVE_TEMPLATES = [
   '今天节奏稳，比催促更重要',
   '认真完成的样子，我看见了',
 ]
+function approveTemplatesForChild(c: any): string[] {
+  const band =
+    c?.ageBand ||
+    (monitor.children.find((x) => x.studentId === c?.studentId) as any)?.ageBand ||
+    localStorage.getItem('ageBand') ||
+    'general'
+  return [...getAgeContentPack(band).approveTemplates]
+}
 const REJECT_TEMPLATES = [
   ...REPAIR_REJECT_TEMPLATES,
   '再仔细一点也没关系，我们一起改',
@@ -1201,7 +1465,8 @@ function retryLoad() {
 const coalescedLoad = createCoalescedAsync(loadOnce, { waitMs: 400 })
 
 function requestLoad(soft = true) {
-  if (soft) nextLite = true
+  // soft→lite；显式全量须清掉 pending lite，避免 coalesce 后仍走轻量
+  nextLite = soft
   coalescedLoad.schedule()
 }
 
@@ -1249,7 +1514,7 @@ async function onBatchApproveConfirm() {
       ids: normals.map((c: any) => c.id),
       action: 'approve',
       liked: true,
-      note: APPROVE_TEMPLATES[0],
+      note: approveTemplatesForChild(normals[0])[0] || APPROVE_TEMPLATES[0],
       skipMakeup: true,
     })
     const ok = res?.okCount ?? res?.ok?.length ?? 0
@@ -1298,16 +1563,38 @@ async function confirm(
 function approve(c: any) {
   prompt.mode = 'approve'
   prompt.target = c
+  const templates = approveTemplatesForChild(c)
+  const emoChips = chipsForEmotionFunction(emotionHintNote.value?.kind)
+  const merged = [...emoChips, ...templates].filter(
+    (x, i, a) => a.indexOf(x) === i,
+  ).slice(0, 5)
+  const pack = getAgeContentPack(
+    c?.ageBand ||
+      (monitor.children.find((x) => x.studentId === c?.studentId) as any)?.ageBand ||
+      localStorage.getItem('ageBand') ||
+      'general',
+  )
   prompt.title = c.isMakeup ? '通过补上进度并点赞' : '通过并点赞'
-  prompt.message = c.isMakeup
-    ? '补上进度通过后发放部分积分。写一句过程赞，孩子会更有动力。'
-    : '写一句过程赞（努力、方法、节奏），比笼统「真棒」更能养胜任感。'
-  prompt.placeholder = '例如：这一步方法用得不错'
+  prompt.message =
+    pack.celebrateTone === 'co_regulate'
+      ? '先看见孩子做到了。写一句抱抱式的话即可。'
+      : c.isMakeup
+        ? '补上进度通过后发放部分积分。写一句过程赞即可。'
+        : '写一句过程赞（努力、方法、节奏）即可。'
+  prompt.placeholder =
+    pack.celebrateTone === 'co_regulate' ? '例如：我看见你做到了' : '例如：这一步方法用得不错'
   prompt.confirmText = c.isMakeup ? '通过补上进度' : '通过并点赞'
-  prompt.templates = APPROVE_TEMPLATES
+  prompt.templates = merged
   prompt.requireNote = true
-  prompt.initialNote = APPROVE_TEMPLATES[0]
-  prompt.hint = '点模板可快速填入，也可自己改'
+  prompt.initialNote = merged[0]
+  prompt.hint = ''
+  prompt.optionalNote = [
+    emotionHintNote.value ? emotionHintNote.value.parentNote : '',
+    '点上方模板可快速填入，也可自己改。',
+    pack.celebrateTone === 'co_regulate' ? '不必催分，看见过程就好。' : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
   prompt.open = true
 }
 
@@ -1322,6 +1609,7 @@ function reject(c: any) {
   prompt.requireNote = true
   prompt.initialNote = ''
   prompt.hint = ''
+  prompt.optionalNote = '退回不是否定，是一起再改一版。'
   prompt.open = true
 }
 
@@ -1354,7 +1642,8 @@ function openApproveProposal(p: any) {
   prompt.templates = PROPOSAL_POINT_TEMPLATES
   prompt.requireNote = false
   prompt.initialNote = '5 分（推荐）'
-  prompt.hint = '不选也默认 5 分'
+  prompt.hint = ''
+  prompt.optionalNote = '不选模板也默认 5 分；分值可再改。'
   prompt.open = true
 }
 
@@ -1368,7 +1657,8 @@ function openRejectProposal(p: any) {
   prompt.templates = PROPOSAL_REJECT_TEMPLATES
   prompt.requireNote = true
   prompt.initialNote = ''
-  prompt.hint = '写一句给对方，沟通更顺畅'
+  prompt.hint = ''
+  prompt.optionalNote = '写清楚原因，比只点拒绝更有商量感。'
   prompt.open = true
 }
 
@@ -1420,9 +1710,10 @@ function openNudge(c: MonitorChild) {
   prompt.templates = NUDGE_TEMPLATES
   prompt.requireNote = true
   prompt.initialNote = NUDGE_TEMPLATES[0]
-  prompt.hint = first
-    ? `「${first.title}」还没收尾，写一句鼓励就好`
-    : '写一句鼓励就好'
+  prompt.hint = ''
+  prompt.optionalNote = first
+    ? `「${first.title}」还没收尾；提醒有冷却，不会太频繁。`
+    : '提醒有冷却，不会太频繁。'
   prompt.open = true
 }
 
@@ -1482,14 +1773,14 @@ function startPoll() {
   clearPoll()
   timer = window.setInterval(() => {
     if (document.visibilityState !== 'visible') return
-    // 后台轮询只用 lite，减轻服务端；可见性恢复 / 关键操作仍走全量
+    // 轮询 / 可见性恢复 / keep-alive 激活：默认 lite；手动刷新与 WS 重连仍走全量
     requestLoad(true)
   }, POLL_MS)
 }
 
 function onVisibilityChange() {
   if (document.visibilityState === 'visible') {
-    requestLoad(false)
+    requestLoad(true)
     startPoll()
   } else {
     clearPoll()
@@ -1497,11 +1788,14 @@ function onVisibilityChange() {
 }
 
 onMounted(async () => {
-  nextLite = false
+  // PERF P6：首屏 lite 快出，再补全量洞察（轮询本就走 lite）
+  nextLite = true
   await coalescedLoad.runNow()
   connectWs()
   startPoll()
   document.addEventListener('visibilitychange', onVisibilityChange)
+  nextLite = false
+  coalescedLoad.schedule()
 })
 
 let skipActivatedLoad = true
@@ -1510,7 +1804,7 @@ onActivated(() => {
     skipActivatedLoad = false
     return
   }
-  requestLoad(false)
+  requestLoad(true)
 })
 
 watch(taskSyncTick, () => {
@@ -1535,9 +1829,75 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.relation-hero {
+  margin-bottom: 12px;
+  border-color: color-mix(in srgb, var(--accent, #2f6f4e) 28%, var(--line));
+  background: linear-gradient(165deg, #f3faf6 0%, #fff 70%);
+}
+.relation-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+}
+.monitor-tips {
+  margin-bottom: 4px;
+}
+.monitor-tips-fold {
+  margin: 0 0 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.monitor-tips-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: none;
+  background: transparent;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  min-height: var(--tap-min, 44px);
+}
+.monitor-tips-body {
+  padding: 0 10px 10px;
+}
+.monitor-tips-body :deep(.card-panel),
+.monitor-tips-body :deep(.journal-soft-tip) {
+  margin-bottom: 8px;
+}
 .headline-card {
   text-align: center;
   margin-bottom: 14px;
+}
+.relation-first-hint {
+  margin: 6px 0 4px;
+}
+.headline-stats {
+  margin-top: 8px;
+}
+.cal-soft-banner,
+.emotion-fn-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cal-soft-banner {
+  border-color: rgba(180, 140, 40, 0.25);
+  background: linear-gradient(160deg, #fffaf0 0%, #fff 90%);
+}
+.emotion-fn-note {
+  flex-direction: column;
+  border-color: rgba(80, 120, 160, 0.22);
+  background: linear-gradient(160deg, #f5f8fc 0%, #fff 90%);
 }
 .headline-top {
   display: flex;

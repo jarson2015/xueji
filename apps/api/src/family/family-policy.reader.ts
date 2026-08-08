@@ -38,6 +38,8 @@ export type AllowanceConfig = {
   allowanceLargeCents: number;
   allowanceSavePercent: number;
   allowanceNote: string;
+  allowanceAchievementBonusEnabled: boolean;
+  allowanceAchievementBonusMaxCents: number;
 };
 
 export type PointsPactConfig = {
@@ -96,6 +98,8 @@ const DEFAULT_ALLOWANCE: AllowanceConfig = {
   allowanceLargeCents: 5000,
   allowanceSavePercent: 0,
   allowanceNote: '',
+  allowanceAchievementBonusEnabled: false,
+  allowanceAchievementBonusMaxCents: 20000,
 };
 const DEFAULT_PACT: PointsPactConfig = {
   pointsPactEnabled: false,
@@ -347,6 +351,12 @@ export class FamilyPolicyReader {
         allowanceNote:
           rows.map((r) => r.allowanceNote).find((n) => n?.trim()) ||
           '零花钱和学迹积分是两套：积分换愿望，零花钱练真实用钱。',
+        allowanceAchievementBonusEnabled: rows.some(
+          (r) => !!r.allowanceAchievementBonusEnabled,
+        ),
+        allowanceAchievementBonusMaxCents: Math.min(
+          ...rows.map((r) => r.allowanceAchievementBonusMaxCents ?? 20000),
+        ),
       },
       pointsPact: {
         pointsPactEnabled: rows.some((r) => !!r.pointsPactEnabled),

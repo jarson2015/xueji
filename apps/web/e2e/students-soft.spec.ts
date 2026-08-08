@@ -24,7 +24,7 @@ async function loginAsParent(page: Page) {
 }
 
 test.describe('学迹学生管理 SoftPrompt', () => {
-  test('刷新登录码 / 重置密码走 SoftPrompt', async ({ page }) => {
+  test('刷新登录�?/ 重置密码�?SoftPrompt', async ({ page }) => {
     const nativeDialogs: string[] = []
     page.on('dialog', async (d) => {
       nativeDialogs.push(d.type())
@@ -38,23 +38,23 @@ test.describe('学迹学生管理 SoftPrompt', () => {
     })
 
     await page.getByRole('button', { name: '更多操作' }).first().click()
-    await page.getByRole('menuitem', { name: '刷新登录码' }).click()
+    await page.getByRole('menuitem', { name: '刷新登录�? }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await expect(page.getByRole('heading', { name: '刷新登录码' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '刷新登录�? })).toBeVisible()
     await expect(dialog.locator('.sp-msg')).toContainText(/立刻失效/)
     await expect(dialog.getByRole('button', { name: '刷新' })).toBeVisible()
-    await dialog.getByRole('button', { name: /取消|再想想/ }).click()
+    await dialog.getByRole('button', { name: /取消|再想�? }).click()
     await expect(dialog).toHaveCount(0)
 
     await page.getByRole('button', { name: '更多操作' }).first().click()
     await page.getByRole('menuitem', { name: '重置密码' }).click()
     await expect(dialog).toBeVisible()
     await expect(page.getByRole('heading', { name: /重置.*密码/ })).toBeVisible()
-    await expect(dialog.locator('.sp-msg')).toContainText(/至少 6 位/)
-    await expect(dialog.getByPlaceholder('输入新密码')).toBeVisible()
+    await expect(dialog.locator('.sp-msg')).toContainText(/至少 6 �?)
+    await expect(dialog.getByPlaceholder('输入新密�?)).toBeVisible()
     await expect(dialog.getByRole('button', { name: '重置' })).toBeVisible()
-    await dialog.getByRole('button', { name: /取消|再想想/ }).click()
+    await dialog.getByRole('button', { name: /取消|再想�? }).click()
     await expect(dialog).toHaveCount(0)
 
     expect(nativeDialogs).toEqual([])

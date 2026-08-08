@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page) {
   await page.goto('/login')
@@ -39,8 +39,8 @@ async function mockFeaturesOff(page: Page) {
   })
 }
 
-test.describe('学迹学生 More / 关功能空态', () => {
-  test('未开功能：More 无可选；空态 CTA 不进公约', async ({ page }) => {
+test.describe('学迹学生 More / 关功能空�?, () => {
+  test('未开功能：More 无可选；空�?CTA 不进公约', async ({ page }) => {
     await loginStudent(page)
     await mockFeaturesOff(page)
 
@@ -48,18 +48,18 @@ test.describe('学迹学生 More / 关功能空态', () => {
     await expect(page.getByRole('heading', { name: '更多功能' })).toBeVisible({
       timeout: 15_000,
     })
-    await expect(page.getByRole('heading', { name: '可选' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: '可�? })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: '零花账本' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: '积分约定' })).toHaveCount(0)
 
     await page.goto('/student/allowance')
-    await expect(page.getByText(/还没打开零花钱/)).toBeVisible({ timeout: 15_000 })
-    await page.getByRole('button', { name: '去愿望商店' }).click()
+    await expect(page.getByText(/还没打开零花�?)).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('button', { name: '去愿望商�? }).click()
     await expect(page).toHaveURL(/\/student\/rewards/)
     await expect(page).not.toHaveURL(/covenant/)
 
     await page.goto('/student/pacts')
-    await expect(page.getByText(/暂未开启积分约定/)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/暂未开启积分约�?)).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: '回到今日' }).click()
     await expect(page).toHaveURL(/\/student\/today/)
     await expect(page).not.toHaveURL(/covenant/)

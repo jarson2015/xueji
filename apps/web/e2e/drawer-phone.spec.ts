@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page) {
   await page.goto('/login')
@@ -35,7 +35,7 @@ test.describe('学迹手机抽屉高度', () => {
         getComputedStyle(root).height
       )
     })
-    // 变量已注入页面；抽屉高度应接近 88vh 上限逻辑（有计算值）
+    // 变量已注入页面；抽屉高度应接�?88vh 上限逻辑（有计算值）
     const cssVar = await page.evaluate(() =>
       getComputedStyle(document.documentElement)
         .getPropertyValue('--drawer-phone')

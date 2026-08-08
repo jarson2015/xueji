@@ -63,7 +63,7 @@ async function mockApi(page: Page, opts?: { notify?: boolean }) {
       await route.fulfill({
         status: 404,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 404, message: '手账不存在', data: null }),
+        body: JSON.stringify({ code: 404, message: '手账不存�?, data: null }),
       })
       return
     }
@@ -166,11 +166,11 @@ async function mockApi(page: Page, opts?: { notify?: boolean }) {
 }
 
 test.describe('学迹家庭说说 P3', () => {
-  test('手账页可见新回应提醒开关', async ({ page }) => {
+  test('手账页可见新回应提醒开�?, async ({ page }) => {
     await mockApi(page)
     await seedStudent(page)
     await page.goto('/student/journal')
-    await expect(page.getByText('新回应提醒')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('新回应提�?)).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('.notify-prefs .el-switch')).toBeVisible()
   })
 

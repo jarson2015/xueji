@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page) {
   await page.goto('/login')
@@ -14,7 +14,7 @@ async function clearSession(page: Page) {
 }
 
 test.describe('学迹学生兑换 SoftPrompt', () => {
-  test('愿望页：近端兑 / SoftPrompt / 签收条控件', async ({ page }) => {
+  test('愿望页：近端�?/ SoftPrompt / 签收条控�?, async ({ page }) => {
     await clearSession(page)
     await page.getByRole('button', { name: '学生进入' }).click()
     await page.keyboard.type(STUDENT_CODE)
@@ -28,7 +28,7 @@ test.describe('学迹学生兑换 SoftPrompt', () => {
     })
 
     const nearRedeem = page.locator('.near-term-block .tap-btn').filter({
-      hasText: /兑愿望|再攒一点|等待中/,
+      hasText: /兑愿望|再攒一点|等待�?,
     })
     if (await nearRedeem.count()) {
       await expect(nearRedeem.first()).toBeVisible()
@@ -36,7 +36,7 @@ test.describe('学迹学生兑换 SoftPrompt', () => {
 
     const redeemBtn = page
       .locator('button.tap-btn')
-      .filter({ hasText: '兑愿望' })
+      .filter({ hasText: '兑愿�? })
       .first()
     if (await redeemBtn.isVisible().catch(() => false)) {
       await redeemBtn.click()
@@ -44,7 +44,7 @@ test.describe('学迹学生兑换 SoftPrompt', () => {
       await expect(dialog).toBeVisible()
       await expect(
         page.getByRole('heading', {
-          name: /确认兑换|积分约定提醒|家庭互助卡/,
+          name: /确认兑换|积分约定提醒|家庭互助�?,
         }),
       ).toBeVisible()
       await expect(dialog.locator('.sp-msg')).toBeVisible()
@@ -57,13 +57,13 @@ test.describe('学迹学生兑换 SoftPrompt', () => {
       await expect(dialog).toHaveCount(0)
     } else {
       await expect(
-        page.getByText(/愿望商店|慢慢攒|先兑这些|还没有愿望/),
+        page.getByText(/愿望商店|慢慢攒|先兑这些|还没有愿�?),
       ).toBeVisible()
     }
 
     const ack = page.locator('.ack-strip').first()
     if (await ack.isVisible().catch(() => false)) {
-      await expect(ack.getByText(/已兑现/).first()).toBeVisible()
+      await expect(ack.getByText(/已兑�?).first()).toBeVisible()
       await expect(
         ack.locator('button.tap-btn').filter({ hasText: '我收到了' }).first(),
       ).toBeVisible()

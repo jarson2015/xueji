@@ -22,7 +22,13 @@
       <p v-if="deferredPointsHint" class="muted tiny deferred">{{ deferredPointsHint }}</p>
 
       <div
-        v-if="!requireConfirm && pointsAwarded > 0 && !interestMode && !intrinsicMode"
+        v-if="
+          !requireConfirm &&
+          !isTeen &&
+          pointsAwarded > 0 &&
+          !interestMode &&
+          !intrinsicMode
+        "
         class="points"
         :class="{ soft: true }"
       >
@@ -33,11 +39,14 @@
         兴趣探索完成；星星/积分只是顺便的
       </p>
 
-      <div v-if="!hideMeta" class="meta muted">
+      <div v-if="!effectiveHideMeta" class="meta muted">
         <span>{{ rhythmLabel }}</span>
         <span v-if="showBalance && !intrinsicMode">{{ pointsUnit }} {{ pointsBalance }}</span>
       </div>
-      <div v-else-if="pointsBalance != null && showBalance && !intrinsicMode" class="meta muted">
+      <div
+        v-else-if="pointsBalance != null && showBalance && !intrinsicMode && !isTeen"
+        class="meta muted"
+      >
         <span>{{ pointsUnit }} {{ pointsBalance }}</span>
       </div>
 
@@ -83,6 +92,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { getAgeContentPack } from '../composables/ageContentPack'
 import { pointsUnitLabel } from '../composables/pointsNarrative'
 
 const props = withDefaults(
@@ -128,30 +138,41 @@ const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
 const cardRef = ref<HTMLElement | null>(null)
 
-const isYoung = computed(() => props.ageBand === 'young')
-const isTeen = computed(() => props.ageBand === 'teen' || props.quiet)
+const agePack = computed(() => getAgeContentPack(props.ageBand))
+/** U2.3：跟 ageContentPack.celebrateTone */
+const isYoung = computed(
+  () => agePack.value.celebrateTone === 'co_regulate' || props.ageBand === 'young',
+)
+const isTeen = computed(
+  () =>
+    agePack.value.celebrateTone === 'quiet' ||
+    props.quiet ||
+    props.ageBand === 'teen',
+)
+const effectiveHideMeta = computed(
+  () => props.hideMeta || (isTeen.value && !props.requireConfirm),
+)
 
 const celebrateEmoji = computed(() => {
   if (props.requireConfirm) return '👀'
-  if (props.quiet || isTeen.value) return '✓'
+  if (isTeen.value) return '✓'
   if (isYoung.value) return '⭐'
   return '🎉'
 })
 
 const celebrateTitle = computed(() => {
   if (props.requireConfirm) return '已交给家长'
-  if (props.quiet || isTeen.value) return '完成'
+  if (isTeen.value) return '完成'
   if (isYoung.value) return '真棒！'
   return '太棒了！'
 })
 
-const processFallback = computed(() =>
-  props.requireConfirm
-    ? '你已经认真做完了，等家长看一眼就好。'
-    : isYoung.value
-      ? '你做到了，这比分数更重要。'
-      : '这件事你做到了，这比分数更重要。',
-)
+const processFallback = computed(() => {
+  if (props.requireConfirm) return '你已经认真做完了，等家长看一眼就好。'
+  if (isYoung.value) return '你做到了，这比分数更重要。我们一起慢慢来。'
+  if (isTeen.value) return '这件事你安排完了。'
+  return '这件事你做到了，这比分数更重要。'
+})
 
 const deferredPointsHint = computed(() => {
   if (props.requireConfirm || props.pointsAwarded > 0) return ''
@@ -173,17 +194,21 @@ const rhythmLabel = computed(() => {
 })
 
 const showBalance = computed(
-  () => !props.quiet && props.pointsAwarded > 0 && !props.interestMode,
+  () =>
+    !isTeen.value &&
+    !agePack.value.balanceDeemphasized &&
+    props.pointsAwarded > 0 &&
+    !props.interestMode,
 )
 const showWish = computed(
   () =>
-    !props.quiet &&
+    !isTeen.value &&
     !props.interestMode &&
     (props.pointsAwarded > 0 || (props.nextWish?.lackPoints ?? 1) <= 0),
 )
 const pointsUnit = computed(() => pointsUnitLabel(props.ageBand || 'general'))
 const pointsAsideLabel = computed(() =>
-  props.ageBand === 'young' ? '顺便点亮' : '顺便得到',
+  isYoung.value ? '顺便点亮' : '顺便得到',
 )
 
 const wishPercent = computed(() => {

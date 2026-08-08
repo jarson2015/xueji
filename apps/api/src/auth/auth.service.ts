@@ -7,6 +7,19 @@ import { User } from '../entities/user.entity';
 import { UserRole } from '../common/enums';
 import { LoginCodeDto, LoginDto, RegisterParentDto } from './dto';
 import { StudentsService } from '../students/students.service';
+import {
+  hashLoginCode,
+  isValidLoginCodeFormat,
+  normalizeLoginCodeInput,
+} from '../common/login-code';
+
+/** Well-known demo codes (plaintext only for login-page hints; DB stores hash). */
+const DEMO_LOGIN_CODES: Record<string, string> = {
+  student1: '10293847',
+  student2: '20384756',
+};
+
+type TokenVia = 'password' | 'code' | 'proxy';
 
 @Injectable()
 export class AuthService {
@@ -16,13 +29,36 @@ export class AuthService {
     private readonly students: StudentsService,
   ) {}
 
-  private async issueToken(user: User, opts?: { proxy?: boolean }) {
-    const payload: { sub: number; role: string; proxy?: boolean } = {
+  private async issueToken(
+    user: User,
+    opts?: { proxy?: boolean; via?: TokenVia },
+  ) {
+    const via: TokenVia = opts?.proxy ? 'proxy' : opts?.via || 'password';
+    const payload: {
+      sub: number;
+      role: string;
+      via: TokenVia;
+      proxy?: boolean;
+      pe?: number;
+    } = {
       sub: user.id,
       role: user.role,
+      via,
     };
-    if (opts?.proxy) payload.proxy = true;
-    const token = await this.jwt.signAsync(payload);
+    if (opts?.proxy) {
+      payload.proxy = true;
+    }
+    // Students: always bind session epoch (code / password / proxy)
+    if (user.role === UserRole.STUDENT) {
+      payload.pe = user.proxyEpoch || 0;
+    }
+    const expiresIn =
+      via === 'proxy'
+        ? process.env.JWT_PROXY_EXPIRES_IN || '2h'
+        : via === 'code'
+          ? process.env.JWT_CODE_EXPIRES_IN || '12h'
+          : process.env.JWT_EXPIRES_IN || '7d';
+    const token = await this.jwt.signAsync(payload, { expiresIn } as any);
     return {
       accessToken: token,
       user: {
@@ -49,7 +85,7 @@ export class AuthService {
         pointsBalance: 0,
       }),
     );
-    return this.issueToken(user);
+    return this.issueToken(user, { via: 'password' });
   }
 
   async login(dto: LoginDto) {
@@ -57,12 +93,20 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('用户名或密码错误');
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('用户名或密码错误');
-    return this.issueToken(user);
+    return this.issueToken(user, { via: 'password' });
+  }
+
+  private async findStudentByLoginCode(code: string): Promise<User | null> {
+    const hash = hashLoginCode(code);
+    return this.users.findOne({ where: { loginCodeHash: hash } });
   }
 
   async loginByCode(dto: LoginCodeDto) {
-    const code = String(dto.code || '').trim();
-    const user = await this.users.findOne({ where: { loginCode: code } });
+    const code = normalizeLoginCodeInput(dto.code);
+    if (!isValidLoginCodeFormat(code)) {
+      throw new UnauthorizedException('登录码无效');
+    }
+    const user = await this.findStudentByLoginCode(code);
     if (!user || user.role !== UserRole.STUDENT) {
       throw new UnauthorizedException('登录码无效');
     }
@@ -72,7 +116,7 @@ export class AuthService {
     ) {
       throw new UnauthorizedException('登录码已过期，请让家长刷新');
     }
-    return this.issueToken(user);
+    return this.issueToken(user, { via: 'code' });
   }
 
   /** Parent enters student session on shared device (client keeps parent token backup). */
@@ -82,16 +126,19 @@ export class AuthService {
       where: { id: studentId, role: UserRole.STUDENT },
     });
     if (!user) throw new UnauthorizedException('学生不存在');
+    if (!user.loginCodeHash) {
+      throw new UnauthorizedException('请先为学生生成登录码');
+    }
     if (
       !user.loginCodeExpiresAt ||
       new Date(user.loginCodeExpiresAt).getTime() < Date.now()
     ) {
       throw new UnauthorizedException('登录码已过期，请先刷新后再帮孩子进入');
     }
-    return this.issueToken(user, { proxy: true });
+    return this.issueToken(user, { proxy: true, via: 'proxy' });
   }
 
-  async me(userId: number) {
+  async me(userId: number, isProxy = false) {
     const user = await this.users.findOne({ where: { id: userId } });
     if (!user) throw new UnauthorizedException();
     return {
@@ -100,6 +147,7 @@ export class AuthService {
       name: user.name,
       role: user.role,
       pointsBalance: user.pointsBalance,
+      isProxy: !!isProxy,
     };
   }
 
@@ -136,10 +184,15 @@ export class AuthService {
         const expired =
           !s.loginCodeExpiresAt ||
           new Date(s.loginCodeExpiresAt).getTime() < now;
+        const known = DEMO_LOGIN_CODES[s.username];
+        const hashOk =
+          !!known &&
+          !!s.loginCodeHash &&
+          s.loginCodeHash === hashLoginCode(known);
         return {
           name: s.name,
           username: s.username,
-          loginCode: expired ? null : s.loginCode,
+          loginCode: !expired && hashOk ? known : null,
           expired,
         };
       }),

@@ -23,8 +23,8 @@ async function loginAsParent(page: Page) {
   await expect(page).toHaveURL(/\/parent(\/monitor)?/)
 }
 
-test.describe('学迹看板连接态文案', () => {
-  test('正常连接不刷「实时已连接」；浏览器离线见「离线刷新中」', async ({
+test.describe('学迹看板连接态文�?, () => {
+  test('正常连接不刷「实时已连接」；浏览器离线见「离线刷新中�?, async ({
     page,
     context,
   }) => {
@@ -33,10 +33,10 @@ test.describe('学迹看板连接态文案', () => {
     await expect(page.getByRole('heading', { name: '今日看板' })).toBeVisible({
       timeout: 15_000,
     })
-    await expect(page.getByText('实时已连接')).toHaveCount(0)
+    await expect(page.getByText('实时已连�?)).toHaveCount(0)
 
     await context.setOffline(true)
-    await expect(page.getByText('离线刷新中')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('实时已连接')).toHaveCount(0)
+    await expect(page.getByText('离线刷新�?)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('实时已连�?)).toHaveCount(0)
   })
 })

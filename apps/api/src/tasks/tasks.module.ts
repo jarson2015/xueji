@@ -6,9 +6,11 @@ import { TaskStep } from '../entities/task-step.entity';
 import { CheckIn } from '../entities/checkin.entity';
 import { User } from '../entities/user.entity';
 import { TaskProposal } from '../entities/task-proposal.entity';
+import { FamilySettings } from '../entities/family-settings.entity';
 import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
 import { TaskStreakService } from './task-streak.service';
+import { DayArchiveScheduler } from './day-archive.scheduler';
 import { StudentsModule } from '../students/students.module';
 import { FamilyModule } from '../family/family.module';
 import { EventsModule } from '../events/events.module';
@@ -16,13 +18,21 @@ import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Task, TaskAssign, TaskStep, CheckIn, User, TaskProposal]),
+    TypeOrmModule.forFeature([
+      Task,
+      TaskAssign,
+      TaskStep,
+      CheckIn,
+      User,
+      TaskProposal,
+      FamilySettings,
+    ]),
     forwardRef(() => StudentsModule),
     forwardRef(() => FamilyModule),
     EventsModule,
     PushModule,
   ],
-  providers: [TasksService, TaskStreakService],
+  providers: [TasksService, TaskStreakService, DayArchiveScheduler],
   controllers: [TasksController],
   exports: [TasksService, TaskStreakService],
 })

@@ -6,8 +6,8 @@
 
 本包包含：
   docker-compose.fnos.yml
-  nginx-web.conf
-  .env.example
+  nginx.conf（含 login/login-code/register 的 limit_req）
+  .env.example（含 TRUST_PROXY=1）
   OVERWRITE.txt（覆盖升级说明）
   api/（dist + package.json + docker-start.sh）
   web/
@@ -20,7 +20,7 @@
 1) 解压到 /vol1/1000/www/xueji（覆盖升级见 OVERWRITE.txt）
 
 2) 检查 .env（首次：cp .env.example .env）
-   - XUEJI_DB_HOST / DB_PASSWORD / JWT_SECRET / CORS_ORIGIN
+   - XUEJI_DB_HOST / DB_PASSWORD / JWT_SECRET / CORS_ORIGIN / TRUST_PROXY=1
 
 3) 启动
    cd /vol1/1000/www/xueji
@@ -29,8 +29,9 @@
 4) 验证
    http://NAS_IP:8080
    http://NAS_IP:8080/api/health
+   （API 不再映射宿主机 :3000，请勿直连绕过 Nginx）
 
-5) 含新功能（如积分赠予 / 迁移 0020）时
+5) 含新功能 / 迁移时
    首次或升级请设 DB_MIGRATIONS_RUN=true，跑通后改回 false
    详见 OVERWRITE.txt
 
@@ -38,8 +39,9 @@
 说明
 ────────────────────────────────
 
-- web 用官方 nginx 镜像挂载静态文件
+- web 用官方 nginx 镜像挂载静态文件 + 整份 nginx.conf
 - api 用 node:20 镜像挂载预编译 dist，首次按 docker-start.sh 装依赖
+- API 仅容器网内暴露，对外只开 WEB_PORT（默认 8080）
 - 上传文件落在 data/uploads
 - 覆盖生产时务必保留 .env 与 data/uploads
 - 积分赠予与约定共用开关；低龄家庭不可开

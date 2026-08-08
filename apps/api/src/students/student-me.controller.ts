@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
 import { IsArray, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { StudentPrefsService } from './student-prefs.service';
-import { JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxyGuard, JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxy } from '../common/forbid-proxy.decorator';
 import { Roles } from '../common/roles.decorator';
 import { UserRole } from '../common/enums';
 import { CurrentUser } from '../common/current-user.decorator';
@@ -60,7 +61,7 @@ class WeekendReviewBodyDto {
 }
 
 @Controller()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ForbidProxyGuard)
 @Roles(UserRole.STUDENT)
 export class StudentMeController {
   constructor(private readonly prefs: StudentPrefsService) {}
@@ -70,7 +71,9 @@ export class StudentMeController {
     return this.prefs.getWeeklyGoal(user.id);
   }
 
+  /** 周主题/目标须孩子本人；代登不可代写 */
   @Put('my/weekly-goal')
+  @ForbidProxy()
   putWeeklyGoal(
     @CurrentUser() user: { id: number },
     @Body() dto: WeeklyGoalBodyDto,
@@ -83,6 +86,7 @@ export class StudentMeController {
     return this.prefs.getDailyFocus(user.id);
   }
 
+  // 今日顺序：代登可协助排程（不涉及积分/契约）
   @Put('my/daily-focus')
   putDailyFocus(
     @CurrentUser() user: { id: number },
@@ -96,7 +100,9 @@ export class StudentMeController {
     return this.prefs.getWeekendReview(user.id);
   }
 
+  /** 周末小会文案须孩子本人 */
   @Put('my/weekend-review')
+  @ForbidProxy()
   putWeekendReview(
     @CurrentUser() user: { id: number },
     @Body() dto: WeekendReviewBodyDto,

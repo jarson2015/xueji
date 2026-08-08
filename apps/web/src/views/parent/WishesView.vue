@@ -9,7 +9,10 @@
       </el-button>
     </div>
 
-    <p class="lead muted">孩子可提报；你定积分后上架。兑换先扣分，「兑现」表示给到，「先缓缓」退回。</p>
+    <p class="lead muted">
+      孩子可提报；你定积分后上架。兑换先扣分，「兑现」表示给到，「先缓缓」退回。
+    </p>
+    <p class="muted tiny-hint non-buy-hint">{{ generalNonBuyHint }}</p>
 
     <div class="card-panel action-strip" v-if="proposedWishes.length">
       <h3>待审定 <el-tag type="warning" size="small">{{ proposedWishes.length }}</el-tag></h3>
@@ -392,7 +395,10 @@ import {
 } from '../../composables/fulfillSoftCopy'
 import EmptyState from '../../components/EmptyState.vue'
 import { labels } from '../../composables/labels'
+import { getAgeContentPack } from '../../composables/ageContentPack'
 import { createLoadGate, tryBegin } from '../../composables/asyncGuard'
+
+const generalNonBuyHint = getAgeContentPack('general').nonBuyWishHint || ''
 import {
   NEAR_TERM_TEMPLATES,
   NEAR_TERM_PRICE_CHIPS,

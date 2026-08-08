@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThanOrEqual, Repository } from 'typeorm';
+import { In, IsNull, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { GrowthMilestone } from '../entities/growth-milestone.entity';
 import { CheckIn } from '../entities/checkin.entity';
 import { StudentsService } from '../students/students.service';
@@ -128,6 +128,49 @@ export class GrowthService {
       byMonth.set(month, bucket);
     }
     return [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month));
+  }
+
+  /** 周报只用计数，避免嵌完整 album/portfolio */
+  async portfolioStats(studentId: number): Promise<{
+    photoCount: number;
+    milestoneCount: number;
+    reflectionCount: number;
+  }> {
+    const sincePhoto = new Date();
+    sincePhoto.setDate(sincePhoto.getDate() - 90);
+    const sinceReflect = new Date();
+    sinceReflect.setDate(sinceReflect.getDate() - 14);
+    const [photoRaw, milestoneCount, reflectRows] = await Promise.all([
+      this.checkins.count({
+        where: {
+          studentId,
+          createdAt: MoreThanOrEqual(sincePhoto),
+          confirmStatus: In([ConfirmStatus.NONE, ConfirmStatus.APPROVED]),
+          imageUrl: Not(IsNull()),
+        },
+      }),
+      this.milestones.count({ where: { studentId } }),
+      this.checkins.find({
+        where: {
+          studentId,
+          createdAt: MoreThanOrEqual(sinceReflect),
+          confirmStatus: In([ConfirmStatus.NONE, ConfirmStatus.APPROVED]),
+        },
+        select: ['id', 'reflectionText', 'moodTag'],
+        order: { createdAt: 'DESC' },
+        take: 40,
+      }),
+    ]);
+    const reflectionCount = reflectRows.filter(
+      (r) =>
+        (r.reflectionText && r.reflectionText.trim()) ||
+        (r.moodTag && r.moodTag.trim()),
+    ).length;
+    return {
+      photoCount: Math.min(photoRaw, 30),
+      milestoneCount: Math.min(milestoneCount, 30),
+      reflectionCount: Math.min(reflectionCount, 12),
+    };
   }
 
   /** 作品集：主题周 + 里程碑 + 照片 + 近期反思（不新建表） */

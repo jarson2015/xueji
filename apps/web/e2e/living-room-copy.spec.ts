@@ -15,7 +15,7 @@ async function clearSession(page: Page) {
 }
 
 test.describe('学迹家长 More 客厅导航白话', () => {
-  test('白话开关可见；页面无 ?tv= 口吻', async ({ page }) => {
+  test('白话开关可见；页面�??tv= 口吻', async ({ page }) => {
     await clearSession(page)
     await page.getByRole('button', { name: '家长' }).click()
     await page.getByRole('textbox', { name: '账号' }).fill(PARENT_USER)
@@ -24,17 +24,17 @@ test.describe('学迹家长 More 客厅导航白话', () => {
     await expect(page).toHaveURL(/\/parent(\/monitor)?/)
 
     await page.goto('/parent/more')
-    await expect(page.getByRole('button', { name: '用客厅导航' })).toBeVisible({
+    await expect(page.getByRole('button', { name: '用客厅导�? })).toBeVisible({
       timeout: 15_000,
     })
     await expect(page.getByRole('button', { name: '恢复完整导航' })).toBeVisible()
-    await expect(page.getByText(/大屏办公默认是完整侧栏/)).toBeVisible()
+    await expect(page.getByText(/大屏办公默认是完整侧�?)).toBeVisible()
 
     const bodyText = await page.locator('.page').innerText()
     expect(bodyText).not.toMatch(/\?tv=/)
     expect(bodyText).not.toMatch(/tv=1/)
 
-    await page.getByRole('button', { name: '用客厅导航' }).click()
+    await page.getByRole('button', { name: '用客厅导�? }).click()
     await expect
       .poll(async () =>
         page.evaluate(() => localStorage.getItem('xueji_tv_mode')),

@@ -28,7 +28,7 @@ function lineWidth(n: number) {
 .page-skeleton {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sk-gap, 12px);
   padding: 4px 0 16px;
 }
 .page-skeleton.compact {
@@ -36,6 +36,7 @@ function lineWidth(n: number) {
 }
 .sk-hero {
   min-height: 96px;
+  border-radius: var(--radius);
 }
 .sk-row {
   display: flex;

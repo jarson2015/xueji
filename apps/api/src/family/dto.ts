@@ -126,6 +126,17 @@ export class UpdateFamilySettingsDto {
   @IsOptional()
   @ToBoolean()
   @IsBoolean()
+  allowanceAchievementBonusEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(100)
+  @Max(10_000_000)
+  allowanceAchievementBonusMaxCents?: number;
+
+  @IsOptional()
+  @ToBoolean()
+  @IsBoolean()
   pointsPactEnabled?: boolean;
 
   @IsOptional()

@@ -55,7 +55,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Stage 'data\uploads') | Ou
 Set-Content -Path (Join-Path $Stage 'data\uploads\.gitkeep') -Value '' -Encoding utf8
 
 Copy-Item (Join-Path $Root 'docker-compose.fnos.yml') (Join-Path $Stage 'docker-compose.fnos.yml')
-Copy-Item (Join-Path $Tpl 'nginx-web.conf') (Join-Path $Stage 'nginx-web.conf')
+# 整份 nginx.conf（含 limit_req_zone）；勿只打 nginx-web.conf
+Copy-Item (Join-Path $Tpl 'nginx.conf') (Join-Path $Stage 'nginx.conf')
 Copy-Item (Join-Path $Tpl 'docker-start.sh') (Join-Path $Stage 'api\docker-start.sh')
 Copy-Item (Join-Path $Tpl '.env.example') (Join-Path $Stage '.env.example')
 Copy-Item (Join-Path $Tpl 'OVERWRITE.txt') (Join-Path $Stage 'OVERWRITE.txt')

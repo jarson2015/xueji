@@ -102,3 +102,22 @@ export class SaveToGoalDto {
   @Max(10_000_000)
   amountCents: number;
 }
+
+export class CreateAchievementClaimDto {
+  @IsInt()
+  studentId: number;
+
+  @IsString()
+  @MaxLength(80)
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  note?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(10_000_000)
+  amountCents: number;
+}

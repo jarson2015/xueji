@@ -11,14 +11,17 @@ import { CheckinsService } from './checkins.service';
  * 当前 HH:mm 匹配且当日未跑过则批处理（跳过补上进度）。
  *
  * 开销优化：
- * - 无启用家庭时 5 分钟内不再查库
- * - 有启用时按「时间点」等值过滤，绝大多数分钟零行
+ * - 无启用家庭时 10 分钟内不再 count
+ * - 有启用时缓存「存在启用」5 分钟，多数分钟只跑按时间等值过滤
  */
 @Injectable()
 export class AutoConfirmPendingScheduler {
   private readonly logger = new Logger(AutoConfirmPendingScheduler.name);
-  /** 无启用家庭时跳过查库至该时间戳 */
+  /** 无启用家庭时跳过至该时间戳 */
   private emptyUntilMs = 0;
+  /** 「是否有启用家庭」缓存有效期 */
+  private hasEnabledUntilMs = 0;
+  private hasEnabled = false;
 
   constructor(
     @InjectRepository(FamilySettings)
@@ -29,6 +32,8 @@ export class AutoConfirmPendingScheduler {
   /** 设置里打开开关后可调用，立刻解除空结果退避 */
   bumpEnabledCache() {
     this.emptyUntilMs = 0;
+    this.hasEnabledUntilMs = 0;
+    this.hasEnabled = true;
   }
 
   @Cron('* * * * *', { timeZone: 'Asia/Shanghai' })
@@ -36,18 +41,24 @@ export class AutoConfirmPendingScheduler {
     const now = Date.now();
     if (now < this.emptyUntilMs) return;
 
-    const enabledCount = await this.settings.count({
-      where: { autoConfirmPendingEnabled: true },
-    });
-    if (enabledCount === 0) {
-      this.emptyUntilMs = now + 5 * 60_000;
+    if (now >= this.hasEnabledUntilMs) {
+      const enabledCount = await this.settings.count({
+        where: { autoConfirmPendingEnabled: true },
+      });
+      this.hasEnabled = enabledCount > 0;
+      this.hasEnabledUntilMs = now + 5 * 60_000;
+      if (!this.hasEnabled) {
+        this.emptyUntilMs = now + 10 * 60_000;
+        return;
+      }
+    } else if (!this.hasEnabled) {
       return;
     }
 
     const nowHm = formatShanghaiHm();
     const today = formatDate();
 
-    // 时间已在 PUT 时规范为 HH:mm；按此刻等值过滤
+    // 时间已在 PUT 时规范为 HH:mm；按此刻等值过滤（绝大多数分钟零行）
     const rows = await this.settings.find({
       where: [
         {

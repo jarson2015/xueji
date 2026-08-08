@@ -27,10 +27,11 @@ process.env.JWT_SECRET = 'test-secret-key-at-least-24chars!!';
 
 console.log('upload-url unit tests');
 
-test('normalizes and signs upload paths', () => {
+test('normalizes and signs upload paths bound to viewer uid', () => {
   const now = Math.floor(Date.now() / 1000);
-  const signed = signUploadPath('/uploads/a.jpg', 60, now);
+  const signed = signUploadPath('/uploads/a.jpg', 60, now, 42);
   assert.ok(signed.startsWith('/uploads/a.jpg?exp='));
+  assert.ok(signed.includes('uid=42'));
   assert.ok(signed.includes('sig='));
   const u = new URL(signed, 'http://local');
   assert.strictEqual(
@@ -38,15 +39,49 @@ test('normalizes and signs upload paths', () => {
       '/uploads/a.jpg',
       u.searchParams.get('exp') || undefined,
       u.searchParams.get('sig') || undefined,
+      u.searchParams.get('uid') || undefined,
     ),
     true,
   );
 });
 
-test('rejects missing or bad signatures', () => {
-  assert.strictEqual(verifyUploadAccess('/uploads/a.jpg', undefined, undefined), false);
+test('rejects missing uid or cross-viewer sig reuse', () => {
+  const now = Math.floor(Date.now() / 1000);
+  const signed = signUploadPath('/uploads/a.jpg', 60, now, 7);
+  const u = new URL(signed, 'http://local');
   assert.strictEqual(
-    verifyUploadAccess('/uploads/a.jpg', '9999999999', 'ab'.repeat(32)),
+    verifyUploadAccess(
+      '/uploads/a.jpg',
+      u.searchParams.get('exp') || undefined,
+      u.searchParams.get('sig') || undefined,
+      undefined,
+    ),
+    false,
+  );
+  assert.strictEqual(
+    verifyUploadAccess(
+      '/uploads/a.jpg',
+      u.searchParams.get('exp') || undefined,
+      u.searchParams.get('sig') || undefined,
+      '99',
+    ),
+    false,
+  );
+});
+
+test('without viewerId does not mint unbound signature', () => {
+  const out = signUploadPath('/uploads/a.jpg', 60, undefined, null);
+  assert.strictEqual(out, '/uploads/a.jpg');
+  assert.ok(!out.includes('sig='));
+});
+
+test('rejects missing or bad signatures', () => {
+  assert.strictEqual(
+    verifyUploadAccess('/uploads/a.jpg', undefined, undefined, '1'),
+    false,
+  );
+  assert.strictEqual(
+    verifyUploadAccess('/uploads/a.jpg', '9999999999', 'ab'.repeat(32), '1'),
     false,
   );
 });
@@ -58,7 +93,7 @@ test('rejects path traversal in normalize', () => {
 
 test('requireSafeUploadPath accepts local uploads and rejects external', () => {
   assert.strictEqual(
-    requireSafeUploadPath('/uploads/a.jpg?exp=1&sig=x'),
+    requireSafeUploadPath('/uploads/a.jpg?exp=1&uid=1&sig=x'),
     '/uploads/a.jpg',
   );
   let blocked = false;
@@ -77,11 +112,12 @@ test('requireSafeUploadPath accepts local uploads and rejects external', () => {
   assert.ok(blocked);
 });
 
-test('generateNumericLoginCode is 6 digits', () => {
+test('generateNumericLoginCode is 8 digits by default', () => {
   for (let i = 0; i < 20; i++) {
     const c = generateNumericLoginCode();
-    assert.ok(/^\d{6}$/.test(c));
+    assert.ok(/^\d{8}$/.test(c));
   }
+  assert.ok(/^\d{6}$/.test(generateNumericLoginCode(6)));
 });
 
 test('invite codes use safe alphabet', () => {
@@ -90,13 +126,22 @@ test('invite codes use safe alphabet', () => {
   assert.ok(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]+$/.test(c));
 });
 
-test('signUploadUrlsInData signs nested imageUrl', () => {
-  const out = signUploadUrlsInData({
-    imageUrl: '/uploads/x.png',
-    nested: [{ imageUrl: '/uploads/y.jpg' }],
-  });
+test('signUploadUrlsInData signs nested imageUrl for viewer', () => {
+  const out = signUploadUrlsInData(
+    {
+      imageUrl: '/uploads/x.png',
+      nested: [{ imageUrl: '/uploads/y.jpg' }],
+    },
+    3,
+  );
   assert.ok(String(out.imageUrl).includes('sig='));
+  assert.ok(String(out.imageUrl).includes('uid=3'));
   assert.ok(String(out.nested[0].imageUrl).includes('sig='));
+});
+
+test('signUploadUrlsInData without viewer leaves paths unsigned', () => {
+  const out = signUploadUrlsInData({ imageUrl: '/uploads/x.png' }, null);
+  assert.strictEqual(out.imageUrl, '/uploads/x.png');
 });
 
 process.env.JWT_SECRET = prev;

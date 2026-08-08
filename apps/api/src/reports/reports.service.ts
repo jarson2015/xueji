@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThanOrEqual, Repository } from 'typeorm';
 import { CheckIn } from '../entities/checkin.entity';
@@ -8,6 +8,7 @@ import { PointPact } from '../entities/point-pact.entity';
 import { User } from '../entities/user.entity';
 import { StudentsService } from '../students/students.service';
 import {
+  AssignStatus,
   ConfirmStatus,
   PointPactStatus,
   TaskCategory,
@@ -21,9 +22,7 @@ import {
 } from './report-insights';
 import { buildParentCoachInsights } from '../dashboard/parent-coach-insights';
 import { ProgressExtrasService } from '../common/progress-extras.service';
-import { FamilyService } from '../family/family.service';
 import { FamilyPolicyReader } from '../family/family-policy.reader';
-import { CheckinsService } from '../checkins/checkins.service';
 import { TaskStreakService } from '../tasks/task-streak.service';
 import { isPactOnTime } from '../pacts/pact-math';
 import { StudentPrefsService } from '../students/student-prefs.service';
@@ -41,11 +40,8 @@ export class ReportsService {
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly students: StudentsService,
     private readonly extras: ProgressExtrasService,
-    private readonly family: FamilyService,
     private readonly familyPolicy: FamilyPolicyReader,
     private readonly streaks: TaskStreakService,
-    @Inject(forwardRef(() => CheckinsService))
-    private readonly checkinSvc: CheckinsService,
     private readonly prefs: StudentPrefsService,
     private readonly growth: GrowthService,
   ) {}
@@ -86,42 +82,49 @@ export class ReportsService {
 
     if (!ids.length) return empty;
 
-    // Settle weekly_digest pending points when family uses that strategy
-    const digestSettlements: { studentId: number; points: number; settled: number }[] =
-      [];
+    // weekly_digest 结算改由 WeeklyDigestSettleScheduler，GET 纯读
+    const digestSettlements: {
+      studentId: number;
+      points: number;
+      settled: number;
+    }[] = [];
     const policyMap = await this.familyPolicy.loadForStudents(ids);
-    for (const sid of ids) {
-      const edu = policyMap.get(sid)?.edu || {
-        rewardMode: 'always',
-        ageBand: 'general',
-        reflectionEnabled: true,
-      };
-      if (edu.rewardMode === 'weekly_digest') {
-        const s = await this.checkinSvc.settleWeeklyDigest(sid);
-        if (s.points > 0) {
-          digestSettlements.push({ studentId: sid, ...s });
-        }
-      }
-    }
 
     const since = this.sinceDate();
     const students = await this.users.find({ where: { id: In(ids) } });
     const nameById = new Map(students.map((s) => [s.id, s.name]));
 
-    const assigns = await this.assigns.find({
-      where: { studentId: In(ids) },
-      relations: ['task', 'student'],
-    });
-    const active = assigns.filter((a) => a.task?.active);
+    // 窄投影：完成率/滞后任务只需 id·进度 + task 标题/分类
+    const assigns = await this.assigns
+      .createQueryBuilder('a')
+      .innerJoin('a.task', 'task')
+      .addSelect([
+        'task.id',
+        'task.title',
+        'task.category',
+        'task.active',
+        'task.sourceTemplateId',
+      ])
+      .where('a.studentId IN (:...ids)', { ids })
+      .andWhere('a.status != :archived', { archived: AssignStatus.DAY_ARCHIVED })
+      .andWhere('task.active = :active', { active: true })
+      .getMany();
+    const active = assigns;
 
-    const rows = await this.checkins.find({
-      where: {
-        studentId: In(ids),
-        createdAt: MoreThanOrEqual(since),
-      },
-      relations: ['task', 'student'],
-      order: { createdAt: 'DESC' },
-    });
+    const rows = await this.checkins
+      .createQueryBuilder('c')
+      .leftJoin('c.task', 'task')
+      .addSelect([
+        'task.id',
+        'task.title',
+        'task.category',
+        'task.sourceTemplateId',
+      ])
+      .where('c.studentId IN (:...ids)', { ids })
+      .andWhere('c.createdAt >= :since', { since })
+      .orderBy('c.createdAt', 'DESC')
+      .take(400)
+      .getMany();
 
     const valid = rows.filter((r) =>
       [ConfirmStatus.NONE, ConfirmStatus.APPROVED].includes(
@@ -144,6 +147,7 @@ export class ReportsService {
         studentId: In(ids),
         createdAt: MoreThanOrEqual(since),
       },
+      select: ['id', 'studentId', 'delta', 'createdAt'],
     });
 
     // Daily heatmap + per-day detail for UI date switching
@@ -248,14 +252,10 @@ export class ReportsService {
         ? students[0]?.pointsBalance ?? 0
         : students.reduce((s, u) => s + (u.pointsBalance || 0), 0);
 
-    // Streak (max across selection)
+    // Streak (max across selection) — one batched query
+    const streakByStudent = await this.extras.streaksForStudents(ids);
     let streak = 0;
-    const streakByStudent = new Map<number, number>();
-    for (const id of ids) {
-      const s = await this.extras.streak(id);
-      streakByStudent.set(id, s);
-      streak = Math.max(streak, s);
-    }
+    for (const s of streakByStudent.values()) streak = Math.max(streak, s);
 
     // Lagging: active without checkin this week and not complete
     const laggingTasks = active
@@ -327,9 +327,9 @@ export class ReportsService {
     } | null = null;
     if (ids.length === 1) {
       nextWish = await this.extras.nextWish(ids[0], students[0]?.pointsBalance);
-      const [goal, portfolio, nearStats] = await Promise.all([
+      const [goal, stats, nearStats] = await Promise.all([
         this.prefs.getWeeklyGoal(ids[0]),
-        this.growth.portfolio(ids[0]),
+        this.growth.portfolioStats(ids[0]),
         this.extras.nearWishStats(ids[0], since),
       ]);
       weekTheme =
@@ -341,7 +341,7 @@ export class ReportsService {
               weekKey: goal.weekKey,
             }
           : null;
-      portfolioStats = portfolio.stats;
+      portfolioStats = stats;
       nearWishStats = nearStats;
     }
 
@@ -556,7 +556,7 @@ export class ReportsService {
 
   /** 家务/习惯连续天数（只展示正向，不排行羞辱） */
   private async buildHabitStreaks(
-    ids: number[],
+    _ids: number[],
     active: TaskAssign[],
     nameById: Map<number, string>,
   ) {
@@ -566,6 +566,12 @@ export class ReportsService {
         (a.task.category === TaskCategory.CHORE ||
           a.task.category === TaskCategory.ROUTINE),
     );
+    const byStudent = new Map<number, TaskAssign[]>();
+    for (const a of life) {
+      const list = byStudent.get(a.studentId) || [];
+      list.push(a);
+      byStudent.set(a.studentId, list);
+    }
     const rows: {
       assignId: number;
       taskId: number;
@@ -576,30 +582,42 @@ export class ReportsService {
       studentName?: string;
       note: string;
     }[] = [];
-    for (const a of life) {
-      const habitStreak = await this.streaks.streakForTask(
-        a.studentId,
-        a.taskId,
-        a.task.category,
+    for (const [sid, assigns] of byStudent) {
+      const attached = await this.streaks.attachStreaks(
+        sid,
+        assigns.map((a) => ({
+          assignId: a.id,
+          taskId: a.taskId,
+          schedule: a.task!.schedule,
+          category: a.task!.category,
+          title: a.task!.title,
+        })),
       );
-      const rhythm = await this.streaks.rhythmForTask(a.studentId, a.taskId);
-      if (habitStreak < 2 && rhythm.doneDays < 3) continue;
-      const kind =
-        a.task.category === TaskCategory.CHORE ? '家务' : '习惯';
-      const note =
-        rhythm.onTrack || rhythm.doneDays >= 3
-          ? `${kind}最近 7 天完成了 ${rhythm.doneDays} 次`
-          : `${kind}最近 ${habitStreak} 天有完成`;
-      rows.push({
-        assignId: a.id,
-        taskId: a.taskId,
-        title: a.task.title,
-        category: a.task.category || TaskCategory.ROUTINE,
-        habitStreak,
-        studentId: a.studentId,
-        studentName: a.student?.name || nameById.get(a.studentId),
-        note,
-      });
+      for (const t of attached) {
+        const habitStreak = t.habitStreak || 0;
+        const rhythm = t.habitRhythm || {
+          doneDays: 0,
+          windowDays: 7,
+          targetDays: 3,
+          onTrack: false,
+        };
+        if (habitStreak < 2 && rhythm.doneDays < 3) continue;
+        const kind = t.category === TaskCategory.CHORE ? '家务' : '习惯';
+        const note =
+          rhythm.onTrack || rhythm.doneDays >= 3
+            ? `${kind}最近 7 天完成了 ${rhythm.doneDays} 次`
+            : `${kind}最近 ${habitStreak} 天有完成`;
+        rows.push({
+          assignId: t.assignId,
+          taskId: t.taskId,
+          title: t.title,
+          category: t.category || TaskCategory.ROUTINE,
+          habitStreak,
+          studentId: sid,
+          studentName: nameById.get(sid),
+          note,
+        });
+      }
     }
     return rows.sort((a, b) => b.habitStreak - a.habitStreak).slice(0, 6);
   }

@@ -22,7 +22,7 @@ async function seedStudent(page: Page) {
   })
 }
 
-/** 假 token 时必须挡住所有后端 /api，否则 401 会登出；勿匹配 /src/api 模块 */
+/** �?token 时必须挡住所有后�?/api，否�?401 会登出；勿匹�?/src/api 模块 */
 async function mockApiSafe(page: Page) {
   await page.route((url) => {
     try {
@@ -65,7 +65,7 @@ async function mockApiSafe(page: Page) {
               id: 42,
               authorId: 2,
               authorName: '小明',
-              body: '深链目标帖',
+              body: '深链目标�?,
               visibility: 'family',
               commentCount: 0,
               createdAt: new Date().toISOString(),
@@ -84,7 +84,7 @@ async function mockApiSafe(page: Page) {
               id: 42,
               authorId: 2,
               authorName: '小明',
-              body: '深链目标帖',
+              body: '深链目标�?,
               visibility: 'family',
               commentCount: 0,
               createdAt: new Date().toISOString(),
@@ -231,27 +231,27 @@ async function mockApiSafe(page: Page) {
 }
 
 test.describe('学迹家庭说说 P2', () => {
-  test('?postId= 深链打开帖详情', async ({ page }) => {
+  test('?postId= 深链打开帖详�?, async ({ page }) => {
     await mockApiSafe(page)
     await seedStudent(page)
     await page.goto('/student/journal?postId=42')
-    await expect(page.getByText('深链目标帖').first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('深链目标�?).first()).toBeVisible({ timeout: 15_000 })
   })
 
   test('今日软发现：本周有说说时出现提示', async ({ page }) => {
     await mockApiSafe(page)
     await seedStudent(page)
     await page.goto('/student/today')
-    await expect(page.getByText(/本周有 2 条/)).toBeVisible({
+    await expect(page.getByText(/本周�?2 �?)).toBeVisible({
       timeout: 15_000,
     })
   })
 
-  test('作品集有去家庭说说弱链', async ({ page }) => {
+  test('作品集有去家庭说说弱�?, async ({ page }) => {
     await mockApiSafe(page)
     await seedStudent(page)
     await page.goto('/student/growth?tab=portfolio')
-    await expect(page.getByRole('button', { name: /去家庭说说/ })).toBeVisible({
+    await expect(page.getByRole('button', { name: /去家庭说�? })).toBeVisible({
       timeout: 15_000,
     })
   })

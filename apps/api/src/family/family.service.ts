@@ -38,19 +38,26 @@ export class FamilyService {
     private readonly autoConfirmScheduler?: AutoConfirmPendingScheduler,
   ) {}
 
+  /**
+   * Read family settings. Does NOT insert a row — first persist happens on PUT.
+   * Missing rows return the same defaults as a fresh settings DTO (rewardMode always).
+   */
   async getOrCreate(parentId: number) {
-    let row = await this.settings.findOne({ where: { parentId } });
+    const row = await this.settings.findOne({ where: { parentId } });
     if (!row) {
-      row = await this.settings.save(
-        this.settings.create({
-          parentId,
-          weeklyRestDays: [],
-          extraRestDates: [],
-          rewardMode: 'random',
-        }),
-      );
+      return this.toDto(this.virtualDefaults(parentId));
     }
     return this.toDto(row);
+  }
+
+  /** In-memory defaults only — never saved from GET. */
+  private virtualDefaults(parentId: number): FamilySettings {
+    return this.settings.create({
+      parentId,
+      weeklyRestDays: [],
+      extraRestDates: [],
+      rewardMode: 'always',
+    });
   }
 
   async update(parentId: number, dto: UpdateFamilySettingsDto) {
@@ -60,6 +67,8 @@ export class FamilyService {
         parentId,
         weeklyRestDays: [],
         extraRestDates: [],
+        // Explicit — avoid column default 'random' silently applying on rest-day-only PUT
+        rewardMode: 'always',
       });
     }
     if (dto.weeklyRestDays !== undefined) {
@@ -110,6 +119,14 @@ export class FamilyService {
     }
     if (dto.allowanceNote !== undefined) {
       row.allowanceNote = dto.allowanceNote || null;
+    }
+    if (dto.allowanceAchievementBonusEnabled !== undefined) {
+      row.allowanceAchievementBonusEnabled =
+        dto.allowanceAchievementBonusEnabled;
+    }
+    if (dto.allowanceAchievementBonusMaxCents !== undefined) {
+      row.allowanceAchievementBonusMaxCents =
+        dto.allowanceAchievementBonusMaxCents;
     }
     if (dto.pointsPactEnabled !== undefined) {
       if (dto.pointsPactEnabled) {
@@ -286,6 +303,10 @@ export class FamilyService {
     return this.policy.isRestDay(config, date);
   }
 
+  isRestDayKey(config: RestConfig, dateKey: string): boolean {
+    return this.policy.isRestDayKey(config, dateKey);
+  }
+
   async isRestDayForStudent(studentId: number, date = new Date()) {
     const config = await this.restConfigForStudent(studentId);
     return this.isRestDay(config, date);
@@ -364,6 +385,9 @@ export class FamilyService {
       allowanceLargeCents: row.allowanceLargeCents ?? 5000,
       allowanceSavePercent: row.allowanceSavePercent ?? 0,
       allowanceNote: row.allowanceNote || '',
+      allowanceAchievementBonusEnabled: !!row.allowanceAchievementBonusEnabled,
+      allowanceAchievementBonusMaxCents:
+        row.allowanceAchievementBonusMaxCents ?? 20000,
       pointsPactEnabled: !!row.pointsPactEnabled,
       pointsPactMaxAmount: row.pointsPactMaxAmount ?? 50,
       pointsPactMaxActive: row.pointsPactMaxActive ?? 3,

@@ -9,13 +9,14 @@ import {
 } from '@nestjs/common';
 import { GiftsService } from './gifts.service';
 import { CreatePointGiftDto } from './dto';
-import { JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxyGuard, JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxy } from '../common/forbid-proxy.decorator';
 import { Roles } from '../common/roles.decorator';
 import { UserRole } from '../common/enums';
 import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller('gifts')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ForbidProxyGuard)
 export class GiftsController {
   constructor(private readonly gifts: GiftsService) {}
 
@@ -51,6 +52,7 @@ export class GiftsController {
 
   @Post()
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   create(
     @CurrentUser() user: { id: number },
     @Body() dto: CreatePointGiftDto,
@@ -60,6 +62,7 @@ export class GiftsController {
 
   @Post(':id/accept')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   accept(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,
@@ -69,6 +72,7 @@ export class GiftsController {
 
   @Post(':id/reject')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   reject(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,
@@ -78,6 +82,7 @@ export class GiftsController {
 
   @Post(':id/cancel')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   cancel(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,

@@ -17,6 +17,11 @@ async function bootstrap() {
     process.env.TRUST_PROXY === 'yes';
   if (trust) {
     app.set('trust proxy', 1);
+  } else if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
+    // Rate limits use req.ip; without trust proxy behind a reverse proxy all clients look local
+    console.warn(
+      '[xueji] NODE_ENV=production but TRUST_PROXY is off — if behind Nginx, set TRUST_PROXY=1 so login/invite rate limits see real client IPs',
+    );
   }
   const uploadDir = process.env.UPLOAD_DIR || 'uploads';
   if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });

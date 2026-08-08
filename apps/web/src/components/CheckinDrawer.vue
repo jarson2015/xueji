@@ -84,6 +84,18 @@
             placeholder="想多写一句也可以，不写也完全没关系"
           />
         </el-form-item>
+        <div
+          v-if="showReflectionShare && reflectionEnabled && !form.isMakeup"
+          class="share-reflect"
+        >
+          <el-checkbox
+            :model-value="shareReflectionWithParent"
+            @update:model-value="emit('update:shareReflectionWithParent', !!$event)"
+          >
+            也让家长现在看见这句话
+          </el-checkbox>
+          <p class="muted tiny share-hint">{{ TEEN_REFLECTION_SHARE_HINT }}</p>
+        </div>
       </template>
 
       <el-collapse>
@@ -152,6 +164,18 @@
                 placeholder="想多写一句也可以，不写也完全没关系"
               />
             </el-form-item>
+            <div
+              v-if="showReflectionShare && reflectionEnabled && !form.isMakeup"
+              class="share-reflect"
+            >
+              <el-checkbox
+                :model-value="shareReflectionWithParent"
+                @update:model-value="emit('update:shareReflectionWithParent', !!$event)"
+              >
+                也让家长现在看见这句话
+              </el-checkbox>
+              <p class="muted tiny share-hint">{{ TEEN_REFLECTION_SHARE_HINT }}</p>
+            </div>
           </template>
 
           <el-form-item label="照片（可选）" class="proof-photo-item">
@@ -203,7 +227,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useBreakpoint } from '../composables/useBreakpoint'
-import { MOOD_OPTIONS } from '../composables/eduMood'
+import { moodOptionsForBand } from '../composables/ageContentPack'
+import { TEEN_REFLECTION_SHARE_HINT } from '../composables/teenPrivacy'
 
 export type CheckinFormModel = {
   kind: string
@@ -231,10 +256,14 @@ const props = defineProps<{
   focusReflectionChips?: string[]
   uploading: boolean
   saving: boolean
+  ageBand?: string
+  /** E4.1：teen 反思分享偏好 */
+  shareReflectionWithParent?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [v: boolean]
+  'update:shareReflectionWithParent': [v: boolean]
   submit: []
   'toggle-chip': [chip: string]
   'toggle-focus-chip': [chip: string]
@@ -244,10 +273,16 @@ const emit = defineEmits<{
 }>()
 
 const { isPhone, isTv } = useBreakpoint()
-const moodOptions = MOOD_OPTIONS
-/** 有反思提示语时，心情/复盘提到折叠外（Audit P2.3） */
+const moodOptions = computed(() => moodOptionsForBand(props.ageBand))
+const showReflectionShare = computed(() => props.ageBand === 'teen')
+/**
+ * U2.2：默认最短路径 = 量/步骤 → 确认。
+ * 仅 general 且有反思提示时把复盘提到折叠外；young/teen 一律收进「可选」。
+ */
 const promoteReflection = computed(
   () =>
+    props.ageBand !== 'young' &&
+    props.ageBand !== 'teen' &&
     !!props.reflectionEnabled &&
     !!props.reflectionPrompt?.trim() &&
     !props.form.isMakeup,
@@ -287,12 +322,12 @@ function onUpload(option: any) {
   font-weight: 600;
 }
 .mood-chip.on {
-  border-color: #8b7ad4;
-  background: #f5f2ff;
+  border-color: var(--accent, #2f6f4e);
+  background: var(--accent-soft, #d8ebe0);
 }
 .focus-chip.on {
-  border-color: #3d7eb8;
-  background: #eef5fb;
+  border-color: var(--accent-strong, #1f4d36);
+  background: color-mix(in srgb, var(--accent-soft, #d8ebe0) 70%, #fff);
 }
 .step-group {
   display: flex;
@@ -331,5 +366,12 @@ function onUpload(option: any) {
   border-radius: 8px;
   border: 1px solid var(--line, #e5e5e5);
   background: var(--surface-soft, #f7f7f7);
+}
+.share-reflect {
+  margin: 0 0 12px;
+}
+.share-hint {
+  margin: 6px 0 0;
+  line-height: 1.4;
 }
 </style>

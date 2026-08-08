@@ -10,7 +10,6 @@ import { ReportsController } from './reports.controller';
 import { StudentsModule } from '../students/students.module';
 import { ProgressExtrasModule } from '../common/progress-extras.module';
 import { FamilyModule } from '../family/family.module';
-import { CheckinsModule } from '../checkins/checkins.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { GrowthModule } from '../growth/growth.module';
 
@@ -26,7 +25,6 @@ import { GrowthModule } from '../growth/growth.module';
     forwardRef(() => StudentsModule),
     ProgressExtrasModule,
     forwardRef(() => FamilyModule),
-    forwardRef(() => CheckinsModule),
     forwardRef(() => TasksModule),
     forwardRef(() => GrowthModule),
   ],

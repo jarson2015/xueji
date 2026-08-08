@@ -10,6 +10,9 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-demo-root-only-local}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-demo-study-only-local}
+    # 仅本地调试：映射 MySQL（勿用于公网）
+    ports:
+      - "3306:3306"
 
   api:
     environment:
@@ -19,6 +22,11 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:8080}
       RUN_SEED_ON_START: "true"
       ENABLE_DEMO_HINTS: "true"
+      # 本地直连 API 调试时可关；走 web:8080 反代时保持 1
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       # Allow the local demo JWT (not in production known-weak list when customized above)
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+    # 仅本地调试：映射 API（勿用于公网）
+    ports:
+      - "3000:3000"

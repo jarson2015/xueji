@@ -7,20 +7,20 @@
       }}</p>
     </div>
 
-    <div class="login-card">
+    <div class="login-card" :class="{ 'card-soft': !isTv }">
       <!-- TV：默认学生进入，家长/注册下沉 -->
       <template v-if="isTv">
         <div class="student-enter">
           <p v-if="lastStudentName" class="hello">你好，{{ lastStudentName }}</p>
-          <p class="muted tip">请输入家长给你的 6 位登录码（也可键盘或粘贴）</p>
+          <p class="muted tip">请输入家长给你的 8 位登录码（也可键盘或粘贴）</p>
           <div
             class="code-display"
             role="group"
-            aria-label="6 位登录码"
+            aria-label="8 位登录码"
             :aria-valuetext="codeDigits.length ? codeDigits.join('') : '尚未输入'"
             aria-live="polite"
           >
-            <span v-for="i in 6" :key="i" class="code-cell">{{ codeDigits[i - 1] || '' }}</span>
+            <span v-for="i in CODE_LEN" :key="i" class="code-cell">{{ codeDigits[i - 1] || '' }}</span>
           </div>
           <div class="numpad numpad-tv">
             <button
@@ -150,17 +150,34 @@
 
         <div v-if="mode === 'student'" class="student-enter">
           <p v-if="lastStudentName" class="hello">你好，{{ lastStudentName }}</p>
-          <p class="muted tip">请输入家长给你的 6 位登录码（也可键盘或粘贴）</p>
+          <p class="muted tip">8 位登录码 · 也可键盘或粘贴</p>
           <div
             class="code-display"
             role="group"
-            aria-label="6 位登录码"
+            aria-label="8 位登录码"
             :aria-valuetext="codeDigits.length ? codeDigits.join('') : '尚未输入'"
             aria-live="polite"
           >
-            <span v-for="i in 6" :key="i" class="code-cell">{{ codeDigits[i - 1] || '' }}</span>
+            <span v-for="i in CODE_LEN" :key="i" class="code-cell">{{ codeDigits[i - 1] || '' }}</span>
           </div>
-          <div class="numpad">
+          <el-button
+            type="primary"
+            class="tap-btn full-tap enter-first"
+            :loading="loading"
+            :disabled="codeDigits.length < 6"
+            @click="onStudentSubmit"
+          >
+            进入今日
+          </el-button>
+          <!-- U4.1：手机数字键盘默认折叠，减首屏噪音；TV 仍常显 -->
+          <button
+            type="button"
+            class="numpad-toggle muted"
+            @click="phoneNumpadOpen = !phoneNumpadOpen"
+          >
+            {{ phoneNumpadOpen ? '收起数字键盘' : '打开数字键盘' }}
+          </button>
+          <div v-show="phoneNumpadOpen" class="numpad">
             <button
               v-for="n in numKeys"
               :key="n"
@@ -172,15 +189,6 @@
               {{ n === 'del' ? '⌫' : n }}
             </button>
           </div>
-          <el-button
-            type="primary"
-            class="tap-btn full-tap"
-            :loading="loading"
-            :disabled="codeDigits.length < 6"
-            @click="onStudentSubmit"
-          >
-            进入今日
-          </el-button>
         </div>
 
         <template v-else>
@@ -307,6 +315,9 @@ const route = useRoute()
 const { isTv } = useBreakpoint()
 const loading = ref(false)
 const mode = ref<'parent' | 'register' | 'student'>('student')
+/** U4.1：手机数字键盘默认收起，首屏留给品牌 + 码格 + 进入 */
+const phoneNumpadOpen = ref(false)
+const CODE_LEN = 8
 const codeDigits = ref<string[]>([])
 const lastStudentName = ref(localStorage.getItem('lastStudentName') || '')
 const showDemo = ref(false)
@@ -357,9 +368,9 @@ function onNum(n: string) {
     codeDigits.value = codeDigits.value.slice(0, -1)
     return
   }
-  if (codeDigits.value.length >= 6) return
+  if (codeDigits.value.length >= CODE_LEN) return
   codeDigits.value = [...codeDigits.value, n]
-  if (codeDigits.value.length === 6) void onStudentSubmit()
+  if (codeDigits.value.length === CODE_LEN) void onStudentSubmit()
 }
 
 function fillParent() {
@@ -370,8 +381,8 @@ function fillParent() {
 
 function fillStudentCode(code: string) {
   mode.value = 'student'
-  codeDigits.value = code.replace(/\D/g, '').slice(0, 6).split('')
-  if (codeDigits.value.length === 6) void onStudentSubmit()
+  codeDigits.value = code.replace(/\D/g, '').slice(0, CODE_LEN).split('')
+  if (codeDigits.value.length === CODE_LEN) void onStudentSubmit()
 }
 
 function onCodeKeydown(e: KeyboardEvent) {
@@ -404,11 +415,11 @@ function onCodePaste(e: ClipboardEvent) {
   if (!studentCodeActive() || loading.value) return
   const t = e.target as HTMLElement | null
   if (t?.closest?.('input, textarea, [contenteditable="true"]')) return
-  const digits = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6)
+  const digits = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, CODE_LEN)
   if (!digits) return
   e.preventDefault()
   codeDigits.value = digits.split('')
-  if (codeDigits.value.length === 6) void onStudentSubmit()
+  if (codeDigits.value.length === CODE_LEN) void onStudentSubmit()
 }
 
 async function onParentSubmit() {
@@ -446,7 +457,8 @@ async function onRegister() {
 }
 
 async function onStudentSubmit() {
-  if (codeDigits.value.length < 6 || loading.value) return
+  const len = codeDigits.value.length
+  if (len < 6 || len > CODE_LEN || loading.value) return
   loading.value = true
   try {
     const user = await auth.loginByCode(codeDigits.value.join(''))
@@ -467,7 +479,7 @@ onMounted(async () => {
   await loadDemoHints()
   if (isTv.value) mode.value = 'student'
   const q = String(route.query.code || '').trim()
-  if (/^\d{6}$/.test(q)) {
+  if (/^\d{6,8}$/.test(q)) {
     mode.value = 'student'
     codeDigits.value = q.split('')
     await onStudentSubmit()
@@ -483,56 +495,65 @@ onUnmounted(() => {
 <style scoped>
 .login-wrap {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px
-    calc(24px + env(safe-area-inset-bottom, 0px));
+  gap: 18px;
+  padding: calc(28px + env(safe-area-inset-top, 0px)) 20px
+    calc(28px + env(safe-area-inset-bottom, 0px));
+  /* U4.1：全幅松绿氛围面，品牌不依赖白卡片 */
   background:
-    radial-gradient(ellipse 90% 55% at 50% -8%, rgba(61, 139, 110, 0.28), transparent 58%),
-    radial-gradient(circle at 12% 88%, rgba(255, 246, 232, 0.7), transparent 42%),
-    radial-gradient(circle at 92% 70%, rgba(216, 235, 224, 0.55), transparent 40%),
-    linear-gradient(180deg, #f3f7f4 0%, #eef3f0 40%, #f7faf8 100%);
+    radial-gradient(ellipse 120% 70% at 50% -12%, rgba(47, 111, 78, 0.38), transparent 55%),
+    radial-gradient(circle at 8% 92%, rgba(255, 246, 232, 0.85), transparent 45%),
+    radial-gradient(circle at 96% 62%, rgba(216, 235, 224, 0.7), transparent 42%),
+    linear-gradient(175deg, #e8f2ec 0%, #eef3ef 42%, #f6faf7 100%);
 }
 .login-hero {
   text-align: center;
-  max-width: 520px;
+  max-width: 560px;
+  padding: 4px 8px 0;
 }
 .login-hero h1 {
   margin: 0;
-  font-size: clamp(2.8rem, 9vw, 4.2rem);
-  color: var(--accent-strong, #2f6f56);
-  letter-spacing: 0.14em;
+  font-size: clamp(3.1rem, 11vw, 4.6rem);
+  color: var(--accent-strong, #1f4d36);
+  letter-spacing: 0.16em;
   font-family: var(--font-display);
   font-weight: 400;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.45);
 }
 .tagline {
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 1.08rem;
+  margin: 14px 0 0;
+  color: var(--accent-strong, #1f4d36);
+  font-size: 1.05rem;
   line-height: 1.5;
-  max-width: 18em;
+  max-width: 16em;
   margin-left: auto;
   margin-right: auto;
+  opacity: 0.88;
 }
 .login-card {
   width: min(440px, 100%);
   background: #fff;
   border-radius: 20px;
-  padding: 24px 22px;
+  padding: 22px 20px;
   box-shadow: 0 16px 40px rgba(28, 43, 36, 0.1);
   border: 1px solid rgba(47, 111, 78, 0.08);
+}
+.login-card.card-soft {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 32px rgba(28, 43, 36, 0.08);
 }
 .mode-tabs {
   display: grid;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 .mode-tabs.twin {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.15fr 0.85fr;
 }
 .alt-tabs {
   display: grid;
@@ -544,10 +565,10 @@ onUnmounted(() => {
   min-height: var(--tap-min);
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: #f7faf8;
+  background: transparent;
   color: var(--muted);
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.98rem;
+  font-weight: 500;
   cursor: pointer;
 }
 .mode-tab.mini {
@@ -557,16 +578,35 @@ onUnmounted(() => {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+  font-weight: 600;
 }
 .hello {
-  margin: 0 0 6px;
-  font-size: 1.2rem;
-  font-weight: 700;
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
   text-align: center;
+  color: var(--accent-strong, #1f4d36);
 }
 .tip {
   text-align: center;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
+  font-size: 0.92rem;
+}
+.enter-first {
+  margin-bottom: 10px;
+}
+.numpad-toggle {
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: center;
+  min-height: 40px;
 }
 .tip-left {
   text-align: left;
@@ -574,7 +614,7 @@ onUnmounted(() => {
 }
 .code-display {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 8px;
   margin-bottom: 16px;
 }

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page) {
   await page.goto('/login')
@@ -49,7 +49,7 @@ test.describe('学迹学生约定 SoftPrompt', () => {
               lenderId: myId,
               borrowerId: myId + 1,
               borrowerName: '小红',
-              lenderName: '我',
+              lenderName: '�?,
               amountPoints: 20,
               dueDate: '2026-08-20',
             },
@@ -58,7 +58,7 @@ test.describe('学迹学生约定 SoftPrompt', () => {
               status: 'active',
               lenderId: myId + 1,
               borrowerId: myId,
-              borrowerName: '我',
+              borrowerName: '�?,
               lenderName: '小红',
               amountPoints: 10,
               amountDue: 12,
@@ -104,7 +104,7 @@ test.describe('学迹学生约定 SoftPrompt', () => {
       timeout: 15_000,
     })
     await expect(
-      page.getByText('借用要还回；赠予分享心意。积分不是钱。'),
+      page.getByText('借用要还回；赠予分享心意。积分不是钱�?),
     ).toBeVisible()
 
     const softCases: {
@@ -116,20 +116,20 @@ test.describe('学迹学生约定 SoftPrompt', () => {
       {
         btn: /^同意借出$/,
         title: /确认借出/,
-        msg: /积分不是钱/,
-        cancel: /再想想/,
+        msg: /积分不是�?,
+        cancel: /再想�?,
       },
       {
         btn: /^收下$/,
         title: /收下心意/,
         msg: /不是借的/,
-        cancel: /再想想/,
+        cancel: /再想�?,
       },
       {
-        btn: /^按约定还回$/,
-        title: /按约定还回/,
+        btn: /^按约定还�?/,
+        title: /按约定还�?,
         msg: /说到做到/,
-        cancel: /再等等/,
+        cancel: /再等�?,
       },
     ]
 

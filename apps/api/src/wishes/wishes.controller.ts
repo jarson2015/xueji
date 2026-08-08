@@ -17,13 +17,14 @@ import {
   ReviewRedeemDto,
   UpdateWishDto,
 } from './dto';
-import { JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxyGuard, JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxy } from '../common/forbid-proxy.decorator';
 import { Roles } from '../common/roles.decorator';
 import { UserRole } from '../common/enums';
 import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ForbidProxyGuard)
 export class WishesController {
   constructor(private readonly wishes: WishesService) {}
 
@@ -47,6 +48,7 @@ export class WishesController {
 
   @Post('wishes/propose')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   propose(@CurrentUser() user: { id: number }, @Body() dto: ProposeWishDto) {
     return this.wishes.propose(user.id, dto);
   }
@@ -82,6 +84,7 @@ export class WishesController {
 
   @Post('wishes/:id/redeem')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   redeem(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,
@@ -122,6 +125,7 @@ export class WishesController {
 
   @Post('my/redeems/:id/ack')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   ackRedeem(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,

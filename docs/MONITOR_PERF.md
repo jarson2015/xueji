@@ -7,9 +7,13 @@
 | 基线 | 196 ms | 139 ms | 洞察在读路径 |
 | 第一轮 | 190 ms | 70 ms | lite 跳过洞察尾 |
 | 第二轮 | 54 ms | 16 ms | 跳过 attachStreaks / 轻量任务统计 |
-| **第三轮（本轮）** | **50 ms** | **15 ms** | ETag 304 + 学生一次查出 |
+| **第三轮** | **50 ms** | **15 ms** | ETag 304 + 学生一次查出 |
+| **PERF 基线（P0 前）** | **52.6 ms** | **15.9 ms** | 2026-08-08 本地 sqlite demo |
+| **PERF P0–P2 复跑** | **51.7 ms** | **16.7 ms** | 不劣于基线；etag304 p50 ≈ 2.7 ms；索引 0039 + 批处理已落地 |
 
 无变更轮询（`If-None-Match`）**etag304 p50 ≈ 2.2 ms**（跳过全部 DB）。
+
+相关计划：[`PERF_P0_PLAN.md`](./PERF_P0_PLAN.md) … [`PERF_P6_PLAN.md`](./PERF_P6_PLAN.md)（首屏 lite → 补全量）。
 
 ## 第三轮改动
 

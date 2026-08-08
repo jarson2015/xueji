@@ -12,7 +12,7 @@
       </div>
     </div>
     <p class="lead muted page-lead">
-      常用在上；进阶默认收起。改完点底部「保存」才生效。
+      常用在上，进阶默认收起。改完请点底部「保存」才生效——预填不等于已保存。
     </p>
 
     <p class="edu-tier-label" id="edu-common">常用</p>
@@ -53,6 +53,10 @@
           <el-option label="周末一起结算（打开周报时发放）" value="weekly_digest" />
         </el-select>
       </div>
+      <p class="muted tiny-hint">{{ FADE_PACT_STAGES_NOTE }}</p>
+      <p v-if="rewardMode !== 'always'" class="muted tiny-hint">
+        {{ getAgeContentPack('general').nonBuyWishHint }}
+      </p>
       <p v-if="rewardMode === 'always'" class="muted tiny-hint">
         适合刚建立习惯。稳住 2–4 周后，可改成「有时加分」或「周末一起结算」，少一点「为分而做」。
       </p>
@@ -86,6 +90,19 @@
       <p v-if="rewardMode === 'weekly_digest'" class="muted tiny-hint">
         日常完成先庆祝、暂不加分；周六至周一打开 App 或周报时会自动结算待发积分，周报用来看故事与节奏。
       </p>
+      <div v-if="showTeenWeakPoints" class="fade-banner">
+        <strong>少年档 · 弱积分建议</strong>
+        <p class="muted" style="margin: 6px 0 10px">{{ TEEN_WEAK_POINTS_NOTE }}</p>
+        <el-button
+          v-if="rewardMode === 'always'"
+          type="primary"
+          class="tap-btn"
+          size="small"
+          @click="preselectTeenDigest"
+        >
+          预选「周末一起结算」（仍需保存）
+        </el-button>
+      </div>
       <div class="makeup-row">
         <span>孩子年龄段（家庭默认）</span>
         <el-select v-model="ageBand" size="large" style="min-width: 160px">
@@ -259,6 +276,27 @@
             />
             <span class="muted">%</span>
           </div>
+          <div class="makeup-row">
+            <span>允许成就奖金</span>
+            <el-switch v-model="allowanceAchievementBonusEnabled" size="large" />
+          </div>
+          <p class="muted tiny-hint">
+            成就奖金进零花钱，不加任务积分。适合偶尔的额外奖励，不适合每次打卡。
+          </p>
+          <p v-if="pactBlockedByYoung && allowanceAchievementBonusEnabled" class="muted tiny-hint warn-hint">
+            低龄家庭请慎用现金激励，优先非买物愿望与共同调节。
+          </p>
+          <div v-if="allowanceAchievementBonusEnabled" class="makeup-row">
+            <span>单笔上限（元）</span>
+            <el-input-number
+              v-model="allowanceAchievementBonusMaxYuan"
+              :min="1"
+              :max="10000"
+              :step="10"
+              :precision="2"
+              size="large"
+            />
+          </div>
           <p v-if="allowanceSavePercent > 0" class="muted tiny-hint">
             孩子本周需先存约
             {{ ((allowanceWeeklyYuan * allowanceSavePercent) / 100).toFixed(2) }}
@@ -419,6 +457,90 @@
       </el-collapse>
     </div>
 
+    <div class="card-panel edu-tips-panel" id="edu-tips">
+      <h3>教育小贴士</h3>
+      <p class="lead muted">分龄场景微课，只读、可跳过；点链接去约定、小会或说说。与上方设置分开，不必保存。</p>
+      <div v-if="lessonStudentOptions.length > 1" class="makeup-row">
+        <span>按哪个孩子的年龄段看</span>
+        <el-select v-model="lessonBandSource" size="large" style="min-width: 160px">
+          <el-option label="家庭默认" value="family" />
+          <el-option
+            v-for="s in lessonStudentOptions"
+            :key="s.id"
+            :label="`${s.name}（${s.bandLabel}）`"
+            :value="String(s.id)"
+          />
+        </el-select>
+      </div>
+      <p class="muted tiny-hint">
+        当前筛选「{{ ageBandLabelUi }}」；混龄可在上方切换孩子。
+      </p>
+      <el-collapse v-model="lessonOpen">
+        <el-collapse-item
+          v-for="lesson in visibleLessons"
+          :key="lesson.id"
+          :name="lesson.id"
+        >
+          <template #title>
+            <span class="lesson-title">
+              {{ lesson.title }}
+              <span class="muted tiny lesson-meta">{{ lessonAgeLabel(lesson) }}</span>
+            </span>
+          </template>
+          <p class="lesson-body">{{ lesson.body }}</p>
+          <p class="lesson-try muted">可以试：{{ lesson.tryLine }}</p>
+          <div class="lesson-links">
+            <el-button
+              v-for="link in lesson.links"
+              :key="link.to + link.label"
+              text
+              type="primary"
+              class="tap-btn"
+              @click="goLessonLink(link.to)"
+            >
+              {{ link.label }}
+            </el-button>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
+    </div>
+
+    <div class="card-panel" id="edu-selfcheck">
+      <h3>本月关系自检</h3>
+      <p class="lead muted">{{ SELF_CHECK_DISCLAIMER }}</p>
+      <template v-if="selfCheckDone">
+        <p class="muted tiny-hint">{{ SELF_CHECK_DONE_NOTE }}</p>
+        <el-button class="tap-btn" size="small" @click="resetSelfCheckUi">再看一眼</el-button>
+      </template>
+      <template v-else>
+        <div v-for="q in RELATION_SELF_CHECK_QUESTIONS" :key="q.id" class="selfcheck-q">
+          <p class="selfcheck-text">{{ q.text }}</p>
+          <div class="selfcheck-opts">
+            <button
+              v-for="opt in selfCheckOpts"
+              :key="opt.value"
+              type="button"
+              class="selfcheck-chip"
+              :class="{ on: selfCheckDraft[q.id] === opt.value }"
+              @click="selfCheckDraft[q.id] = opt.value"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+        <div class="selfcheck-actions">
+          <el-button class="tap-btn" @click="onSkipSelfCheck">本月跳过</el-button>
+          <el-button type="primary" class="tap-btn" @click="onSaveSelfCheck">记下（不算分）</el-button>
+        </div>
+      </template>
+    </div>
+
+    <div class="card-panel" id="help">
+      <h3>减负与求助</h3>
+      <p class="lead muted">静态资源，非诊疗、不会自动报警。</p>
+      <el-button class="tap-btn" @click="helpResourcesOpen = true">查看求助资源</el-button>
+    </div>
+
     <el-button
       type="primary"
       class="tap-btn full-tap"
@@ -427,11 +549,22 @@
     >
       保存
     </el-button>
+
+    <SoftPrompt
+      v-model="helpResourcesOpen"
+      :title="HELP_RESOURCES_TITLE"
+      :message="HELP_RESOURCES_BODY"
+      confirm-text="知道了"
+      cancel-text="关闭"
+      :show-input="false"
+      @confirm="helpResourcesOpen = false"
+      @cancel="helpResourcesOpen = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
+import { onActivated, onMounted, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../../api/http'
 import { friendlyError } from '../../composables/useOnboarding'
@@ -450,6 +583,34 @@ import {
 } from '../../composables/timeSlotPolicy'
 import { EDU_PRESETS, presetById, type EduPresetId } from '../../composables/eduPresets'
 import { settingsToPutPayload } from '../../composables/familySettingsIo'
+import {
+  FADE_PACT_STAGES_NOTE,
+  clearFadePactBannerDismiss,
+} from '../../composables/eduRelationCopy'
+import { getAgeContentPack } from '../../composables/ageContentPack'
+import {
+  HELP_RESOURCES_BODY,
+  HELP_RESOURCES_TITLE,
+  TEEN_WEAK_POINTS_NOTE,
+} from '../../composables/teenPrivacy'
+import SoftPrompt from '../../components/SoftPrompt.vue'
+import {
+  lessonAgeLabel,
+  lessonsForAgeBand,
+} from '../../composables/parentMicroLessons'
+import {
+  RELATION_SELF_CHECK_QUESTIONS,
+  SELF_CHECK_DISCLAIMER,
+  SELF_CHECK_DONE_NOTE,
+  type SelfCheckAnswer,
+  currentMonthKey,
+  readSelfCheck,
+  saveSelfCheckAnswers,
+  skipSelfCheckThisMonth,
+} from '../../composables/relationSelfCheck'
+import { useRoute, useRouter } from 'vue-router'
+
+defineOptions({ name: 'ParentFamilyEduView' })
 
 const eduPresets = EDU_PRESETS
 const activePresetId = ref<EduPresetId | ''>('')
@@ -583,6 +744,8 @@ const allowanceWeeklyYuan = ref(50)
 const allowanceLargeYuan = ref(50)
 const allowanceSavePercent = ref(0)
 const allowanceNote = ref('')
+const allowanceAchievementBonusEnabled = ref(false)
+const allowanceAchievementBonusMaxYuan = ref(200)
 const pointsPactEnabled = ref(false)
 const pointsPactMaxAmount = ref(50)
 const pointsPactMaxActive = ref(3)
@@ -594,11 +757,110 @@ const pointsGiftParentApproveAbove = ref(10)
 const pointsGiftDailyMax = ref(1)
 const pointsGiftWeeklyOutMax = ref(40)
 const hasYoungStudent = ref(false)
+const hasTeenStudent = ref(false)
+const lessonStudents = ref<Array<{ id: number; name: string; ageBand: string }>>(
+  [],
+)
+const lessonBandSource = ref('family')
 const pactBlockedByYoung = computed(
   () => ageBand.value === 'young' || hasYoungStudent.value,
 )
+const showTeenWeakPoints = computed(
+  () => ageBand.value === 'teen' || hasTeenStudent.value,
+)
+const helpResourcesOpen = ref(false)
+const lessonOpen = ref<string[]>([])
+const router = useRouter()
+const route = useRoute()
+
+const lessonStudentOptions = computed(() =>
+  lessonStudents.value.map((s) => ({
+    id: s.id,
+    name: s.name,
+    bandLabel:
+      s.ageBand === 'young' ? '低龄' : s.ageBand === 'teen' ? '少年' : '通用',
+  })),
+)
+
+const effectiveLessonBand = computed(() => {
+  if (lessonBandSource.value === 'family') return ageBand.value
+  const sid = Number(lessonBandSource.value)
+  const s = lessonStudents.value.find((x) => x.id === sid)
+  return s?.ageBand || ageBand.value
+})
+
+const visibleLessons = computed(() => lessonsForAgeBand(effectiveLessonBand.value))
+const ageBandLabelUi = computed(() => {
+  const b = effectiveLessonBand.value
+  if (b === 'young') return '低龄'
+  if (b === 'teen') return '少年'
+  return '通用'
+})
+
+function goLessonLink(to: string) {
+  const hashIdx = to.indexOf('#')
+  const path = hashIdx >= 0 ? to.slice(0, hashIdx) : to
+  const hash = hashIdx >= 0 ? to.slice(hashIdx + 1) : ''
+  const scroll = () => {
+    if (!hash) return
+    requestAnimationFrame(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
+    })
+  }
+  if (router.currentRoute.value.path === path) {
+    scroll()
+    return
+  }
+  void router.push(path).then(scroll)
+}
+
+const selfCheckOpts: Array<{ value: SelfCheckAnswer; label: string }> = [
+  { value: 'yes', label: '有' },
+  { value: 'partial', label: '有一点' },
+  { value: 'no', label: '还没有' },
+  { value: 'skip', label: '跳过这题' },
+]
+const selfCheckDraft = ref<Record<string, SelfCheckAnswer>>({})
+const selfCheckDone = ref(false)
+
+function hydrateSelfCheck() {
+  const rec = readSelfCheck(currentMonthKey())
+  if (!rec) {
+    selfCheckDone.value = false
+    selfCheckDraft.value = {}
+    return
+  }
+  if (rec.skipped || Object.keys(rec.answers).length > 0) {
+    selfCheckDone.value = true
+    selfCheckDraft.value = { ...rec.answers }
+  } else {
+    selfCheckDone.value = false
+  }
+}
+
+function onSkipSelfCheck() {
+  skipSelfCheckThisMonth()
+  selfCheckDone.value = true
+  ElMessage.success('已跳过本月自检')
+}
+
+function onSaveSelfCheck() {
+  saveSelfCheckAnswers(selfCheckDraft.value)
+  selfCheckDone.value = true
+  ElMessage.success('已记下（不算分）')
+}
+
+function resetSelfCheckUi() {
+  selfCheckDone.value = false
+}
+
 const fadePreselected = ref(false)
 const fadePreselectFrom = ref('always')
+
+function preselectTeenDigest() {
+  rewardMode.value = 'weekly_digest'
+  ElMessage.success('已预选「周末一起结算」，点底部「保存」后才生效')
+}
 
 function applyFadeSuggest() {
   if (!fadeHint.value) return
@@ -670,6 +932,9 @@ function hydrateFromRes(res: any) {
   allowanceLargeYuan.value = (res.allowanceLargeCents ?? 5000) / 100
   allowanceSavePercent.value = res.allowanceSavePercent ?? 0
   allowanceNote.value = res.allowanceNote || ''
+  allowanceAchievementBonusEnabled.value = !!res.allowanceAchievementBonusEnabled
+  allowanceAchievementBonusMaxYuan.value =
+    (res.allowanceAchievementBonusMaxCents ?? 20000) / 100
   pointsPactEnabled.value = !!res.pointsPactEnabled
   if (pactBlockedByYoung.value && pointsPactEnabled.value) {
     pointsPactEnabled.value = false
@@ -700,6 +965,14 @@ async function load() {
     hasYoungStudent.value = (studentList || []).some(
       (s: any) => s.ageBand === 'young',
     )
+    hasTeenStudent.value = (studentList || []).some(
+      (s: any) => s.ageBand === 'teen',
+    )
+    lessonStudents.value = (studentList || []).map((s: any) => ({
+      id: s.id,
+      name: s.name || `孩子${s.id}`,
+      ageBand: s.ageBand || ageBand.value || 'general',
+    }))
     settingsSnapshot.value = settingsToPutPayload(res)
     hydrateFromRes(res)
     localStorage.setItem('ageBand', ageBand.value)
@@ -752,6 +1025,10 @@ async function save() {
       allowanceLargeCents: yuanToCents(allowanceLargeYuan.value),
       allowanceSavePercent: allowanceSavePercent.value,
       allowanceNote: allowanceNote.value,
+      allowanceAchievementBonusEnabled: allowanceAchievementBonusEnabled.value,
+      allowanceAchievementBonusMaxCents: yuanToCents(
+        allowanceAchievementBonusMaxYuan.value,
+      ),
       pointsPactEnabled: pointsPactEnabled.value,
       pointsPactMaxAmount: pointsPactMaxAmount.value,
       pointsPactMaxActive: pointsPactMaxActive.value,
@@ -765,10 +1042,8 @@ async function save() {
       slotExtendedEnabled: slotExtendedEnabled.value,
       slotClockMap: slotClockPayload(),
     }
-    const saved: any = await http.put('/family/settings', {
-      ...settingsSnapshot.value,
-      ...eduPatch,
-    })
+    // Only this page's fields — PUT is patch-merge on the server
+    const saved: any = await http.put('/family/settings', eduPatch)
     settingsSnapshot.value = settingsToPutPayload(saved || {
       ...settingsSnapshot.value,
       ...eduPatch,
@@ -780,6 +1055,9 @@ async function save() {
     void refreshFlags()
     bumpTaskSync()
     fadePreselected.value = false
+    if (rewardMode.value === 'random' || rewardMode.value === 'weekly_digest') {
+      clearFadePactBannerDismiss()
+    }
     if (saved?.slotClockEffective) {
       fillSlotClockRows(
         !!saved.slotExtendedEnabled,
@@ -799,10 +1077,41 @@ async function save() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  void load().then(() => {
+    hydrateSelfCheck()
+    const lessonQ = String(route.query.lesson || '')
+    if (lessonQ) {
+      lessonOpen.value = [lessonQ]
+    }
+    const hash = window.location.hash?.replace(/^#/, '')
+    if (hash) {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(hash)
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        if (hash === 'edu-tips' || hash === 'edu-selfcheck') {
+          el?.classList.add('edu-hash-flash')
+          window.setTimeout(() => el?.classList.remove('edu-hash-flash'), 2200)
+        }
+      })
+    }
+  })
+})
+
+/** keep-alive 再进入：软拉 settings，避免脏 rewardMode */
+onActivated(() => {
+  void load()
+})
 </script>
 
 <style scoped>
+.edu-tips-panel.edu-hash-flash,
+#edu-selfcheck.edu-hash-flash {
+  outline: 2px solid var(--accent, #2f6f4e);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent-soft, #d8ebe0) 70%, transparent);
+  transition: outline-color 0.3s ease, box-shadow 0.3s ease;
+}
 .page-head-actions {
   display: flex;
   flex-wrap: wrap;
@@ -919,5 +1228,60 @@ h3 {
   border-bottom: none;
   padding: 0;
   min-width: 140px;
+}
+.lesson-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.lesson-meta {
+  font-weight: 400;
+}
+.lesson-body {
+  margin: 0 0 8px;
+  line-height: 1.55;
+}
+.lesson-try {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.lesson-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.selfcheck-q {
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line, #e5e5e5);
+}
+.selfcheck-text {
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+.selfcheck-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.selfcheck-chip {
+  min-height: var(--tap-min, 44px);
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line, #e5e5e5);
+  background: var(--surface, #fff);
+  font: inherit;
+  cursor: pointer;
+}
+.selfcheck-chip.on {
+  border-color: var(--accent, #3d8b6e);
+  background: var(--accent-soft, #eef6f1);
+  font-weight: 600;
+}
+.selfcheck-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
 }
 </style>

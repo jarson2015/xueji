@@ -71,25 +71,10 @@ export class JournalService {
   ) {}
 
   async familyMemberIds(userId: number, role: string): Promise<number[]> {
-    const ids = new Set<number>([userId]);
-    if (role === UserRole.PARENT) {
-      const sids = await this.students.getStudentIdsOfParent(userId);
-      for (const sid of sids) {
-        ids.add(sid);
-        for (const pid of await this.students.getParentIdsOfStudent(sid)) {
-          ids.add(pid);
-        }
-      }
-    } else {
-      const pids = await this.students.getParentIdsOfStudent(userId);
-      for (const pid of pids) {
-        ids.add(pid);
-        for (const sid of await this.students.getStudentIdsOfParent(pid)) {
-          ids.add(sid);
-        }
-      }
-    }
-    return [...ids];
+    return this.students.familyMemberIdsForUser(
+      userId,
+      role === UserRole.PARENT ? UserRole.PARENT : UserRole.STUDENT,
+    );
   }
 
   private assertStudentSelf(user: AuthUser) {
@@ -138,6 +123,7 @@ export class JournalService {
     nameMap: Map<number, string>,
     authors: User[],
     commentCounts: Map<number, number>,
+    previewByPost?: Map<number, any[]>,
   ) {
     return {
       id: p.id,
@@ -152,9 +138,51 @@ export class JournalService {
       sourcePrivateDiaryId: p.sourcePrivateDiaryId,
       imageUrls: p.imageUrls || [],
       commentCount: commentCounts.get(p.id) || 0,
+      /** UJ：列表内嵌 BBS 预览楼层 */
+      previewComments: previewByPost?.get(p.id) || [],
       createdAt: p.createdAt,
       canEdit: p.authorId === user.id && canEditWithinWindow(p.createdAt),
     };
+  }
+
+  /** 批量组装主评+一层跟帖（每帖最多 PREVIEW_ROOT 条主评） */
+  private async previewCommentsForPosts(postIds: number[], previewRoot = 5) {
+    const out = new Map<number, any[]>();
+    if (!postIds.length) return out;
+    // 上限：每帖约 previewRoot 主评 + 若干回复；避免评论墙全量进内存
+    const rows = await this.comments.find({
+      where: { postId: In(postIds), status: 'active' },
+      order: { id: 'ASC' },
+      take: Math.min(2000, postIds.length * (previewRoot + 12)),
+    });
+    const authorIds = [...new Set(rows.map((c) => c.authorId))];
+    const authors = authorIds.length
+      ? await this.users.find({ where: { id: In(authorIds) } })
+      : [];
+    const nameMap = new Map(authors.map((a) => [a.id, a.name]));
+    const mapOne = (c: JournalComment) => ({
+      id: c.id,
+      authorId: c.authorId,
+      authorName: nameMap.get(c.authorId) || '家人',
+      body: c.body,
+      parentCommentId: c.parentCommentId,
+      createdAt: c.createdAt,
+    });
+    for (const pid of postIds) {
+      const mine = rows.filter((c) => c.postId === pid);
+      const top = mine.filter((c) => c.parentCommentId == null).slice(0, previewRoot);
+      const replies = mine.filter((c) => c.parentCommentId != null);
+      out.set(
+        pid,
+        top.map((c) => ({
+          ...mapOne(c),
+          replies: replies
+            .filter((r) => r.parentCommentId === c.id)
+            .map(mapOne),
+        })),
+      );
+    }
+    return out;
   }
 
   async listPosts(user: AuthUser, opts?: { limit?: number; beforeId?: number }) {
@@ -210,8 +238,13 @@ export class JournalService {
       }
     }
 
+    const previewByPost = await this.previewCommentsForPosts(
+      collected.map((r) => r.id),
+      5,
+    );
+
     return collected.map((p) =>
-      this.mapPostRow(p, user, nameMap, authors, commentCounts),
+      this.mapPostRow(p, user, nameMap, authors, commentCounts, previewByPost),
     );
   }
 

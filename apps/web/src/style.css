@@ -19,6 +19,9 @@
   --tap-min: 48px;
   --nav-w: 220px;
   --radius: 16px;
+  --radius-control: 12px;
+  --sk-gap: 12px;
+  --motion-fast: 0.35s;
   --max-content: 1200px;
   /* Q2：young / 庆祝气质（仅挂 .kid-mode / .celebrate-card.is-young） */
   --celebrate-warm: #fff6e8;
@@ -120,7 +123,18 @@ a:focus-visible,
 .big-btn {
   min-height: var(--tap-min) !important;
   font-size: 1.05rem !important;
-  border-radius: 12px !important;
+  border-radius: var(--radius-control) !important;
+}
+
+/** U1.3：失败态条（与暖色空态区分） */
+.state-fail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-color: color-mix(in srgb, var(--warn, #b88230) 40%, var(--line));
+  background: linear-gradient(160deg, #fff8ef 0%, #fff 75%);
 }
 
 .full-tap {
@@ -160,7 +174,7 @@ a:focus-visible,
   padding: 12px 16px;
   background: var(--accent-soft);
   border-bottom: 1px solid var(--line);
-  animation: nudge-in 0.35s ease;
+  animation: nudge-in var(--motion-fast, 0.35s) ease;
 }
 
 @keyframes nudge-in {
@@ -187,6 +201,10 @@ a:focus-visible,
 
 .hero-enter {
   animation: soft-fade 0.4s ease;
+}
+
+.soft-enter {
+  animation: soft-fade var(--motion-fast, 0.35s) ease;
 }
 
 /* Phone */
@@ -253,6 +271,18 @@ a:focus-visible,
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
+/* U4.3：底部抽屉内容/页脚避开 Home 条（高度仍用 --drawer-phone，只补 padding） */
+.el-drawer.btt .el-drawer__body {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+.el-drawer.btt .el-drawer__footer {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+.el-drawer.rtl .el-drawer__body,
+.el-drawer.ltr .el-drawer__body {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+
 .tv-mode .page-title {
   font-size: calc(var(--title-size) * 1.05);
 }
@@ -280,8 +310,12 @@ a:focus-visible,
 
 @media (prefers-reduced-motion: reduce) {
   .hero-enter,
+  .soft-enter,
   .nudge-bar,
-  .skeleton-block {
+  .skeleton-block,
+  .sticky-done-bar .el-button,
+  .sp-card,
+  .relation-hero {
     animation: none !important;
   }
 }

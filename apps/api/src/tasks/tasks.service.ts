@@ -8,7 +8,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Task } from '../entities/task.entity';
 import { TaskAssign } from '../entities/task-assign.entity';
 import { TaskStep } from '../entities/task-step.entity';
@@ -69,16 +69,16 @@ export class TasksService {
 
   async listForParent(parentId: number) {
     const studentIds = await this.students.getStudentIdsOfParent(parentId);
-    // Own tasks + tasks assigned to shared students (co-parent visibility)
+    // 列表不拉 steps（编辑抽屉 GET /tasks/:id）；避免嵌套 join 放大
     const own = await this.tasks.find({
       where: { creatorId: parentId },
-      relations: ['steps', 'assigns', 'assigns.student'],
+      relations: ['assigns', 'assigns.student'],
       order: { id: 'DESC' },
     });
     if (!studentIds.length) return this.withUpgradeHints(own);
     const assigned = await this.assigns.find({
       where: { studentId: In(studentIds) },
-      relations: ['task', 'task.steps', 'task.assigns', 'task.assigns.student'],
+      relations: ['task', 'task.assigns', 'task.assigns.student'],
     });
     const byId = new Map<number, Task>();
     for (const t of own) byId.set(t.id, t);
@@ -89,6 +89,24 @@ export class TasksService {
     }
     const list = [...byId.values()].sort((a, b) => b.id - a.id);
     return this.withUpgradeHints(list);
+  }
+
+  /** Parent task detail (includes steps) for edit drawer. */
+  async getForParent(parentId: number, taskId: number) {
+    const task = await this.tasks.findOne({
+      where: { id: taskId },
+      relations: ['steps', 'assigns', 'assigns.student'],
+    });
+    if (!task) throw new NotFoundException('任务不存在');
+    if (task.creatorId === parentId) {
+      const [enriched] = await this.withUpgradeHints([task]);
+      return enriched;
+    }
+    const bound = await this.students.getStudentIdsOfParent(parentId);
+    const visible = (task.assigns || []).some((a) => bound.includes(a.studentId));
+    if (!visible) throw new NotFoundException('任务不存在');
+    const [enriched] = await this.withUpgradeHints([task]);
+    return enriched;
   }
 
   /**
@@ -129,27 +147,44 @@ export class TasksService {
     };
   }
 
+  /** Batch streaks per student (was N× streakForTask on list). */
   private async withUpgradeHints(list: Task[]) {
-    return Promise.all(
-      list.map(async (task) => {
-        const sid = task.assigns?.[0]?.studentId;
-        let upgradeHint: string | null = null;
-        if (sid && task.schedule === TaskSchedule.DAILY) {
-          const streak = await this.streaks.streakForTask(
-            sid,
-            task.id,
-            task.category,
-          );
-          const hint = suggestDifficultyUpgrade(streak, task.difficultyLevel);
-          upgradeHint = hint.suggest ? hint.message : null;
-        }
-        return {
-          ...task,
-          difficultyLabel: difficultyLabel(task.difficultyLevel),
-          upgradeHint,
-        };
+    const byStudent = new Map<
+      number,
+      { taskId: number; schedule: string; category?: string }[]
+    >();
+    for (const task of list) {
+      const sid = task.assigns?.[0]?.studentId;
+      if (!sid || task.schedule !== TaskSchedule.DAILY) continue;
+      const items = byStudent.get(sid) || [];
+      items.push({
+        taskId: task.id,
+        schedule: task.schedule,
+        category: task.category,
+      });
+      byStudent.set(sid, items);
+    }
+    const streakByTask = new Map<number, number>();
+    await Promise.all(
+      [...byStudent.entries()].map(async ([sid, items]) => {
+        const map = await this.streaks.batchStreaks(sid, items);
+        for (const [tid, n] of map) streakByTask.set(tid, n);
       }),
     );
+    return list.map((task) => {
+      let upgradeHint: string | null = null;
+      const sid = task.assigns?.[0]?.studentId;
+      if (sid && task.schedule === TaskSchedule.DAILY) {
+        const streak = streakByTask.get(task.id) || 0;
+        const hint = suggestDifficultyUpgrade(streak, task.difficultyLevel);
+        upgradeHint = hint.suggest ? hint.message : null;
+      }
+      return {
+        ...task,
+        difficultyLabel: difficultyLabel(task.difficultyLevel),
+        upgradeHint,
+      };
+    });
   }
 
   async create(parentId: number, dto: CreateTaskDto) {
@@ -408,13 +443,16 @@ export class TasksService {
     const enabled =
       makeupEnabled ??
       (await this.checkinPolicy.forStudent(studentId)).makeup.enabled;
-    if (!enabled) {
-      await this.archiveEndedPeriodsWhenNoMakeup(studentId);
-    }
+    // 归档副作用改由 DayArchiveScheduler；读路径只查列表
+    // 列表不拉 steps（打开打卡抽屉时 GET /my/assigns/:id/steps）
     const rows = await this.assigns.find({
-      where: { studentId },
-      relations: ['task', 'task.steps'],
+      where: {
+        studentId,
+        status: Not(AssignStatus.DAY_ARCHIVED),
+      },
+      relations: ['task'],
       order: { id: 'DESC' },
+      take: 100,
     });
     const rotateDuty = await this.buildRotateDutyMap(rows);
     const normalized = rows
@@ -426,6 +464,19 @@ export class TasksService {
         ),
       );
     return this.streaks.attachStreaks(studentId, await this.attachJointPeers(studentId, normalized));
+  }
+
+  /** Lazy steps for check-in drawer (student must own the assign). */
+  async stepsForStudentAssign(studentId: number, assignId: number) {
+    const assign = await this.assigns.findOne({
+      where: { id: assignId, studentId },
+      relations: ['task', 'task.steps'],
+    });
+    if (!assign?.task) throw new NotFoundException('任务不存在');
+    return (assign.task.steps || [])
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((s) => ({ id: s.id, title: s.title, sortOrder: s.sortOrder }));
   }
 
   async listArchivedForStudent(studentId: number) {
@@ -501,7 +552,7 @@ export class TasksService {
 
   /**
    * 禁止补卡时：周期已过的未完成指派温和归档（停止催促），明天虚拟重开。
-   * 惰性触发于 myTasks；豁免休息日当天、待家长确认。
+   * 由 DayArchiveScheduler 触发；豁免休息日当天、待家长确认。
    */
   async archiveEndedPeriodsWhenNoMakeup(studentId: number, now = new Date()) {
     const rows = await this.assigns.find({
@@ -522,19 +573,16 @@ export class TasksService {
       pending.map((c) => c.assignId).filter((id): id is number => id != null),
     );
 
+    const restConfig = this.family
+      ? await this.family.restConfigForStudent(studentId)
+      : null;
+
     const candidates: DayArchiveCandidate[] = [];
     for (const r of rows) {
       if (!r.task?.active) continue;
       let periodWasRestDay = false;
-      if (
-        r.task.schedule === 'daily' &&
-        r.periodKey &&
-        this.family
-      ) {
-        periodWasRestDay = await this.family.isRestDayKeyForStudent(
-          studentId,
-          r.periodKey,
-        );
+      if (r.task.schedule === 'daily' && r.periodKey && restConfig && this.family) {
+        periodWasRestDay = this.family.isRestDayKey(restConfig, r.periodKey);
       }
       candidates.push({
         id: r.id,
@@ -553,36 +601,40 @@ export class TasksService {
     });
     if (!targets.length) return { archived: 0 };
 
-    const byId = new Map(rows.map((r) => [r.id, r]));
-    for (const t of targets) {
-      const row = byId.get(t.id);
-      if (!row) continue;
-      row.status = AssignStatus.DAY_ARCHIVED;
-      await this.assigns.save(row);
-    }
-    return { archived: targets.length };
+    const ids = targets.map((t) => t.id);
+    await this.assigns.update(
+      { id: In(ids) },
+      { status: AssignStatus.DAY_ARCHIVED },
+    );
+    return { archived: ids.length };
   }
 
   /** Batch load active assigns for many students (dashboard monitor/summary). */
   async myTasksForStudents(studentIds: number[]) {
     if (!studentIds.length) return new Map<number, any[]>();
     const policies = await this.checkinPolicy.forStudents(studentIds);
-    // 读路径不做 archiveEndedPeriods（副作用留给学生 myTasks）；
+    // 读路径不做 archiveEndedPeriods（留给 DayArchiveScheduler）；
     // 看板不展示 habitStreak，跳过 attachStreaks。
+    // 不拉 task.steps；排除 day_archived；每孩最多 80 条（id DESC = 较新优先）。
+    const MAX_PER_STUDENT = 80;
     const rows = await this.assigns.find({
-      where: { studentId: In(studentIds) },
-      relations: ['task', 'task.steps'],
+      where: {
+        studentId: In(studentIds),
+        status: Not(AssignStatus.DAY_ARCHIVED),
+      },
+      relations: ['task'],
       order: { id: 'DESC' },
     });
     const byStudent = new Map<number, TaskAssign[]>();
     for (const r of rows) {
       if (!r.task?.active) continue;
       const list = byStudent.get(r.studentId) || [];
+      if (list.length >= MAX_PER_STUDENT) continue;
       list.push(r);
       byStudent.set(r.studentId, list);
     }
     const result = new Map<number, any[]>();
-    const allRows = rows.filter((r) => r.task?.active);
+    const allRows = [...byStudent.values()].flat();
     const rotateDuty = await this.buildRotateDutyMap(allRows);
     for (const sid of studentIds) {
       const assigns = byStudent.get(sid) || [];
@@ -862,7 +914,9 @@ export class TasksService {
     const student = await this.users.findOne({ where: { id: studentId } });
     const message = `${student?.name || '孩子'}想加一件小事，请看看是否合适`;
     this.events.emitToParents(parents, 'task:proposed', {
-      proposal: row,
+      proposalId: row.id,
+      studentId,
+      title: row.title,
       studentName: student?.name || '孩子',
       message,
     });

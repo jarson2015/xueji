@@ -8,8 +8,8 @@
 
 还需要放到同一目录的文件（本包已带）：
   docker-compose.fnos.yml
-  nginx-web.conf
-  .env
+  nginx.conf（含 limit_req；勿只挂 nginx-web.conf）
+  .env（含 TRUST_PROXY=1）
   api/Dockerfile
   api/docker-entrypoint.sh
 

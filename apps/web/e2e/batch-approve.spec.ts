@@ -25,14 +25,14 @@ test.describe('学迹看板批量通过文案', () => {
     await page.locator('form').getByRole('button', { name: '登录' }).click()
     await expect(page).toHaveURL(/\/parent(\/monitor)?/)
 
-    const pending = page.getByRole('region', { name: '待处理' })
+    const pending = page.getByRole('region', { name: '待处�? })
     await expect(pending).toBeVisible({ timeout: 15_000 })
 
     const checks = pending.locator('.row-check')
     const n = await checks.count()
     if (n === 0) {
       await expect(
-        pending.getByText(/暂无待处理|待确认打卡|孩子想加的小事/),
+        pending.getByText(/暂无待处理|待确认打卡|孩子想加的小�?),
       ).toBeVisible()
       return
     }
@@ -44,23 +44,23 @@ test.describe('学迹看板批量通过文案', () => {
     const normalCount = await normalRow.count()
     if (normalCount === 0) {
       await checks.first().click()
-      await pending.getByRole('button', { name: '批量通过并点赞' }).click()
-      await expect(page.getByText(/补上进度请单条确认/)).toBeVisible({
+      await pending.getByRole('button', { name: '批量通过并点�? }).click()
+      await expect(page.getByText(/补上进度请单条确�?)).toBeVisible({
         timeout: 5_000,
       })
       return
     }
 
     await normalRow.first().locator('.row-check').click()
-    await expect(pending.getByText(/已选 \d+ 项/)).toBeVisible()
-    await pending.getByRole('button', { name: '批量通过并点赞' }).click()
+    await expect(pending.getByText(/已�?\d+ �?)).toBeVisible()
+    await pending.getByRole('button', { name: '批量通过并点�? }).click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await expect(page.getByRole('heading', { name: '批量通过' })).toBeVisible()
-    await expect(dialog.getByText(/批量通过并点赞 \d+ 条/)).toBeVisible()
+    await expect(dialog.getByText(/批量通过并点�?\d+ �?)).toBeVisible()
     await expect(dialog.getByText(/默认鼓励/)).toBeVisible()
-    await expect(page.getByRole('button', { name: '通过并点赞' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '通过并点�? })).toBeVisible()
     await page.getByRole('button', { name: '取消' }).click()
     await expect(dialog).toHaveCount(0)
   })

@@ -9,13 +9,14 @@ import {
 } from '@nestjs/common';
 import { PactsService } from './pacts.service';
 import { CreatePointPactDto, ParentWriteOffDto } from './dto';
-import { JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxyGuard, JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxy } from '../common/forbid-proxy.decorator';
 import { Roles } from '../common/roles.decorator';
 import { UserRole } from '../common/enums';
 import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller('pacts')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ForbidProxyGuard)
 export class PactsController {
   constructor(private readonly pacts: PactsService) {}
 
@@ -51,6 +52,7 @@ export class PactsController {
 
   @Post()
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   create(
     @CurrentUser() user: { id: number },
     @Body() dto: CreatePointPactDto,
@@ -60,6 +62,7 @@ export class PactsController {
 
   @Post(':id/accept')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   accept(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,
@@ -69,6 +72,7 @@ export class PactsController {
 
   @Post(':id/reject')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   reject(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,
@@ -78,6 +82,7 @@ export class PactsController {
 
   @Post(':id/cancel')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   cancel(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,
@@ -87,6 +92,7 @@ export class PactsController {
 
   @Post(':id/repay')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   repay(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,

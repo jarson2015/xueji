@@ -6,8 +6,8 @@
 
 包内结构：
   docker-compose.fnos.yml
-  nginx-web.conf
-  .env.example
+  nginx.conf（含 auth limit_req；勿再用仅 conf.d 的 nginx-web.conf）
+  .env.example（含 TRUST_PROXY=1）
   OVERWRITE.txt（本文件）
   api/dist + package.json + docker-start.sh
   web/（前端静态）
@@ -37,9 +37,10 @@
    或手动覆盖：
    - api/dist、api/package.json、api/package-lock.json、api/docker-start.sh
    - 整个 web/
-   - docker-compose.fnos.yml、nginx-web.conf
+   - docker-compose.fnos.yml、nginx.conf
    - 不要覆盖 .env
    - 不要清空 data/uploads
+   - 升级后请确认 .env 含 TRUST_PROXY=1（缺则补上）
 
 4) 若本次含数据库迁移
    编辑 .env：DB_MIGRATIONS_RUN=true
@@ -50,10 +51,14 @@
    - 0019 makeup/愿望默认
    - 0020 point_gifts + 赠予限额字段（积分赠予）
    - 0021 tasks.is_interest + meaning_note（兴趣任务）
+   - 0037 achievement_claims + 成就奖金开关（V1.5；本包含）
+   - 0038–0042 登录码哈希 / PERF 索引（本包含时请跑）
+   - 0043 清除遗留明文 loginCode（会话 pe / SEC；本包含时请跑）
 
 5) 启动
    cd /vol1/1000/www/xueji
-   # 确保 nginx-web.conf、api/docker-start.sh 是「文件」不是空目录
+   # 确保 nginx.conf、api/docker-start.sh 是「文件」不是空目录
+   # 若仍残留旧 nginx-web.conf 目录：rm -rf nginx-web.conf
    docker compose -f docker-compose.fnos.yml --env-file .env up -d
 
 6) 验证
@@ -70,7 +75,7 @@
 ────────────────────────────────
 
 1) 解压到 /vol1/1000/www/xueji
-2) cp .env.example .env 并改密码 / JWT / CORS / XUEJI_DB_HOST
+2) cp .env.example .env 并改密码 / JWT / CORS / XUEJI_DB_HOST；保留 TRUST_PROXY=1
 3) docker compose -f docker-compose.fnos.yml --env-file .env up -d
 4) 首次可设 DB_MIGRATIONS_RUN=true
 
@@ -78,6 +83,10 @@
 注意
 ────────────────────────────────
 
-- 本包不含 node_modules；容器首次启动会按 docker-start.sh 安装依赖
+- 本包不含 node_modules；容器按 package-lock 变化自动重装依赖（见 docker-start.sh）
+- 若升级后报 MODULE_NOT_FOUND（如 @nestjs/schedule）：先删 api/node_modules 再 up -d
+    rm -rf /vol1/1000/www/xueji/api/node_modules
+    docker compose -f docker-compose.fnos.yml --env-file .env up -d
 - 切勿把开发机 .env 打进压缩包覆盖生产
-- 若 Docker 曾把 nginx-web.conf 建成目录：rm -rf nginx-web.conf 后重新上传文件
+- API 不映射宿主机 :3000；对外只开 WEB_PORT（默认 8080）
+- 若 Docker 曾把 nginx.conf / nginx-web.conf 建成目录：rm -rf 后重新上传文件

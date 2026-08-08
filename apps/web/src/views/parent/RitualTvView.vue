@@ -1,9 +1,10 @@
 <template>
-  <!-- 小屏：投屏前闸门 -->
+  <!-- 小屏：投屏前闸门；U4.2 品牌「学迹」为 display 级 -->
   <div v-if="needsGate && !gatePassed" class="ritual-gate page">
     <div class="gate-card card-panel">
+      <h1 class="gate-brand">学迹</h1>
       <p class="gate-kicker muted">客厅仪式屏</p>
-      <h1 class="gate-title">适合投到电视上看</h1>
+      <p class="gate-title">适合投到电视上看</p>
       <p class="muted gate-body">
         自动轮播今日节奏与周末骄傲。投到电视上看；精细操作请回看板。
       </p>
@@ -16,7 +17,10 @@
 
   <div v-else class="ritual-shell" :class="{ 'is-immersive': isTv || gatePassed }">
     <header class="ritual-top">
-      <div class="brand">学迹 · 家庭仪式屏</div>
+      <div class="brand">
+        <span class="brand-name">学迹</span>
+        <span class="brand-sub">家庭仪式屏</span>
+      </div>
       <div class="clock">{{ clockText }}</div>
       <el-button v-if="canFullscreen" class="tap-btn" text @click="toggleFullscreen">
         {{ isFullscreen ? '退出全屏' : '全屏' }}
@@ -218,7 +222,7 @@ function buildSlides(
 async function load() {
   try {
     const [monitor, batch, goals]: [any, any[], any[]] = await Promise.all([
-      http.get('/dashboard/monitor'),
+      http.get('/dashboard/monitor?lite=1'),
       http.get('/students/weekend-reviews').catch(() => []),
       http.get('/students/weekly-goals').catch(() => []),
     ])
@@ -290,22 +294,37 @@ onUnmounted(() => {
   min-height: 70vh;
   display: grid;
   place-items: center;
-  padding: 24px 16px;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 16px
+    calc(24px + env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(ellipse 90% 50% at 50% 0%, rgba(47, 111, 78, 0.18), transparent 55%),
+    var(--bg, #eef3ef);
 }
 .gate-card {
   max-width: 440px;
   width: 100%;
 }
+.gate-brand {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 8vw, 3.2rem);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  color: var(--accent-strong, #1f4d36);
+  line-height: 1.1;
+}
 .gate-kicker {
   margin: 0 0 8px;
-  letter-spacing: 0.08em;
-  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  font-size: 0.9rem;
 }
 .gate-title {
   font-family: var(--font-display);
-  font-size: 1.55rem;
+  font-size: 1.35rem;
   margin: 0 0 12px;
-  line-height: 1.3;
+  line-height: 1.35;
+  color: var(--ink, #1c2b24);
+  font-weight: 500;
 }
 .gate-body {
   margin: 0 0 20px;
@@ -323,7 +342,8 @@ onUnmounted(() => {
   color: #f4f7f2;
   display: flex;
   flex-direction: column;
-  padding: 24px 32px 20px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 32px
+    calc(16px + env(safe-area-inset-bottom, 0px));
 }
 .ritual-top {
   display: flex;
@@ -332,9 +352,22 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 .brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.brand-name {
   font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: clamp(1.45rem, 2.4vw, 1.85rem);
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  line-height: 1.15;
+}
+.brand-sub {
+  font-size: 0.85rem;
+  opacity: 0.72;
+  font-weight: 500;
 }
 .clock {
   margin-left: auto;
@@ -355,17 +388,17 @@ onUnmounted(() => {
   width: 100%;
 }
 .slide-kicker {
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
   font-size: 1rem;
   opacity: 0.7;
   margin: 0 0 12px;
 }
 .slide h1 {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-size: clamp(1.85rem, 4.5vw, 3.2rem);
   margin: 0 0 16px;
   line-height: 1.2;
+  font-weight: 400;
 }
 .slide-body {
   font-size: clamp(1.1rem, 2.5vw, 1.6rem);

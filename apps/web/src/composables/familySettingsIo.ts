@@ -1,12 +1,10 @@
 /**
- * 家庭设置双页（RestDays / FamilyEdu）共用的 GET→PUT 映射。
+ * 家庭设置双页（RestDays / FamilyEdu）共用的 GET 响应整理。
  *
  * 两页都整页 GET `/family/settings`，但各自只编辑一部分字段。
- * 保存时用 `{ ...settingsSnapshot, ...本页 patch }` merge，避免另一页未展示的字段
- * 被表单默认值覆盖写回。
+ * 保存时只 PUT 本页 patch（服务端按字段 merge），避免跨页静默改写 `rewardMode` 等。
  *
- * `settingsToPutPayload` 把 GET 响应整理成与 RestDaysView 原 `save` PUT 对象一致的字段
- *（含 allowance 以分为单位，与库内/API 一致，不做元角转换——元角仅在教育页表单展示层处理）。
+ * `settingsToPutPayload` 把 GET 响应整理为本地 snapshot（含 allowance 以分为单位）。
  */
 export function settingsToPutPayload(res: any): Record<string, any> {
   return {
@@ -35,6 +33,9 @@ export function settingsToPutPayload(res: any): Record<string, any> {
     allowanceLargeCents: res?.allowanceLargeCents ?? 5000,
     allowanceSavePercent: res?.allowanceSavePercent ?? 0,
     allowanceNote: res?.allowanceNote || '',
+    allowanceAchievementBonusEnabled: !!res?.allowanceAchievementBonusEnabled,
+    allowanceAchievementBonusMaxCents:
+      res?.allowanceAchievementBonusMaxCents ?? 20000,
     pointsPactEnabled: !!res?.pointsPactEnabled,
     pointsPactMaxAmount: res?.pointsPactMaxAmount ?? 50,
     pointsPactMaxActive: res?.pointsPactMaxActive ?? 3,

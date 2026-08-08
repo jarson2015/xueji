@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AllowanceAccount } from '../entities/allowance-account.entity';
 import { AllowanceEntry } from '../entities/allowance-entry.entity';
 import { AllowanceGoal } from '../entities/allowance-goal.entity';
+import { AchievementClaim } from '../entities/achievement-claim.entity';
 import { AllowanceService } from './allowance.service';
 import { AllowanceController } from './allowance.controller';
 import { StudentsModule } from '../students/students.module';
@@ -15,6 +16,7 @@ import { EventsModule } from '../events/events.module';
       AllowanceAccount,
       AllowanceEntry,
       AllowanceGoal,
+      AchievementClaim,
     ]),
     forwardRef(() => StudentsModule),
     forwardRef(() => FamilyModule),

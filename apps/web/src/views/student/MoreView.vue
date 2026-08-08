@@ -2,7 +2,7 @@
   <div class="page">
     <h2 class="page-title">{{ labels.studentMore }}</h2>
     <p class="lead muted">
-      日常做事请回「{{ labels.studentToday }}」。这里是计划、公约和家庭功能。
+      做事回「{{ labels.studentToday }}」。这里只放计划和家庭入口。
     </p>
 
     <section class="more-section" aria-labelledby="stu-plan">
@@ -16,7 +16,7 @@
       >
         <div>
           <h3>{{ labels.studentMe }}</h3>
-          <p class="muted">自己的小计划，和本周高光回顾</p>
+          <p class="muted">小计划、作品集、本周主题</p>
         </div>
         <span class="arrow">›</span>
       </div>
@@ -29,7 +29,7 @@
       >
         <div>
           <h3>{{ labels.studentTasks }}</h3>
-          <p class="muted">查全部、搜名字、补进度 · 日常请回「今日」处理</p>
+          <p class="muted">查全部、补进度 · 日常回「今日」</p>
         </div>
         <span class="arrow">›</span>
       </div>
@@ -66,7 +66,7 @@
       >
         <div>
           <h3>{{ labels.studentCovenant }}</h3>
-          <p class="muted">看看我们一起定的规则</p>
+          <p class="muted">一起定的规则</p>
         </div>
         <span class="arrow">›</span>
       </div>
@@ -79,20 +79,7 @@
       >
         <div>
           <h3>周末小会</h3>
-          <p class="muted">和家人聊聊本周骄傲与下周小改</p>
-        </div>
-        <span class="arrow">›</span>
-      </div>
-      <div
-        class="card-panel link-card"
-        role="button"
-        tabindex="0"
-        @click="$router.push('/student/growth?tab=portfolio')"
-        @keydown.enter="$router.push('/student/growth?tab=portfolio')"
-      >
-        <div>
-          <h3>我的成长作品集</h3>
-          <p class="muted">本周主题、照片与里程碑</p>
+          <p class="muted">骄傲与下周小改</p>
         </div>
         <span class="arrow">›</span>
       </div>

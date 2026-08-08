@@ -76,7 +76,7 @@
 
     <div class="card-panel" v-if="report.emotionWordCloud?.length">
       <h3>本周心情词</h3>
-      <p class="muted tiny">来自打卡反思，只做家庭看见，不评分。</p>
+      <p class="muted tiny">{{ NOT_SCORE_DISCLAIMER }} 来自打卡反思，只做家庭看见。</p>
       <div class="emotion-cloud">
         <span
           v-for="tag in report.emotionWordCloud"
@@ -374,6 +374,7 @@ import { useBreakpoint } from '../../composables/useBreakpoint'
 import { friendlyError } from '../../composables/useOnboarding'
 import { labels } from '../../composables/labels'
 import EmptyState from '../../components/EmptyState.vue'
+import { NOT_SCORE_DISCLAIMER } from '../../composables/eduRelationCopy'
 
 const { isTv } = useBreakpoint()
 const students = ref<any[]>([])

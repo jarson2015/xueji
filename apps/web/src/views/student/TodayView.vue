@@ -9,6 +9,16 @@
   >
     <PageSkeleton v-if="loading" :rows="5" />
     <template v-else>
+    <!-- U1.3：硬加载失败不要误显示「都做完啦」 -->
+    <EmptyState
+      v-if="loadError"
+      tone="error"
+      title="今日暂时打不开"
+      description="网络或服务暂时不可用，稍后再试。"
+      action-label="再试一次"
+      @action="retryTodayLoad"
+    />
+    <template v-else>
     <div class="page-head">
       <h2 class="page-title" style="margin: 0">今日</h2>
       <el-tag v-if="!kidMode" effect="plain" type="success">{{ streakRhythmLabel }}</el-tag>
@@ -28,42 +38,48 @@
       </p>
     </div>
 
+    <div
+      v-if="showFadePactBanner"
+      class="card-panel fade-pact-banner"
+      role="status"
+    >
+      <span>{{ FADE_PACT_STUDENT_LINE }}</span>
+      <el-button text type="primary" class="tap-btn" @click="onDismissFadePact">
+        知道了
+      </el-button>
+    </div>
+
+    <div
+      v-if="showTeenWeakPointsTip"
+      class="card-panel fade-pact-banner"
+      role="status"
+    >
+      <span>{{ TEEN_WEAK_POINTS_STUDENT_TIP }}</span>
+      <el-button text type="primary" class="tap-btn" @click="onDismissTeenWeakTip">
+        知道了
+      </el-button>
+    </div>
+
     <p v-if="isTv" class="muted tv-today-hint" role="note">
       大屏只看「下一件」；点完成、调整节奏请用手机。
     </p>
 
-    <!-- P0.1：下一件 Hero 紧接行动区 -->
+    <!-- U2.1：Hero 预算 — 标题 + 一句说明 + 主 CTA；进度/专注/缓做收到次级 -->
     <div v-if="nextItem" class="card-panel hero hero-enter" :key="nextItem.key">
       <div class="badge">{{ heroBadge }}</div>
       <h3>{{ nextItem.title }}</h3>
-      <p
-        v-if="nextItem.kind === 'task' && nextItem.raw?.isInterest"
-        class="interest-pill"
-      >
-        兴趣探索
+      <p class="hero-meta muted">
+        <span v-if="nextItem.kind === 'task' && nextItem.raw?.isInterest" class="interest-inline"
+          >兴趣 ·
+        </span>
+        {{ nextItem.meta }}
       </p>
       <p
         v-if="nextItem.kind === 'task' && nextItem.raw?.meaningNote"
-        class="meaning-note"
+        class="meaning-note hero-meaning"
       >
         {{ nextItem.raw.meaningNote }}
       </p>
-      <p class="muted">{{ nextItem.meta }}</p>
-      <el-progress
-        v-if="nextItem.kind === 'task'"
-        :percentage="Math.round(nextItem.progressPercent || 0)"
-        :stroke-width="isTv ? 14 : 10"
-        style="margin: 12px 0 16px"
-      />
-
-      <FocusTimer
-        :item-key="nextItem.key"
-        :title="nextItem.title"
-        :age-band="ageBand"
-        :start-collapsed="true"
-        @finished="onFocusFinished"
-        @clear-finished="focusJustDone = false"
-      />
 
       <!-- 非手机：主按钮在卡片内；手机用吸底，避免与底栏抢热区 -->
       <el-button
@@ -75,37 +91,58 @@
         {{ doneButtonLabel }}
       </el-button>
 
-      <div v-if="nextItem.kind === 'task' && canDefer" class="hero-secondary">
-        <template v-if="deferInMenu">
-          <el-dropdown trigger="click" @command="onDeferCommand">
-            <el-button text class="tap-btn defer-more-btn" :loading="deferring">
-              更多 ···
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="defer">今天先调整节奏</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-        <el-button
-          v-else
-          text
-          type="info"
-          class="tap-btn defer-link"
-          :loading="deferring"
-          @click="askDefer"
-        >
-          今天先调整节奏
-        </el-button>
-        <p v-if="!kidMode" class="muted tip defer-hint">
-          调整节奏不删任务，只是今天不催（今日还可调整 {{ skipsLeft }} 次）
-        </p>
-      </div>
-
-      <p v-if="nextItem.requireConfirm" class="muted tip">
+      <p v-if="nextItem.requireConfirm" class="muted tip hero-confirm-tip">
         提交后等家长看一眼，通过后才会加分
       </p>
+
+      <el-collapse v-model="heroExtrasOpen" class="hero-extras">
+        <el-collapse-item name="extras">
+          <template #title>
+            <span class="hero-extras-title">进度与专注</span>
+          </template>
+          <el-progress
+            v-if="nextItem.kind === 'task'"
+            :percentage="Math.round(nextItem.progressPercent || 0)"
+            :stroke-width="isTv ? 14 : 10"
+            style="margin: 0 0 12px"
+          />
+          <FocusTimer
+            :item-key="nextItem.key"
+            :title="nextItem.title"
+            :age-band="ageBand"
+            :start-collapsed="true"
+            @finished="onFocusFinished"
+            @clear-finished="focusJustDone = false"
+          />
+          <div v-if="nextItem.kind === 'task' && canDefer" class="hero-secondary">
+            <template v-if="deferInMenu">
+              <el-dropdown trigger="click" @command="onDeferCommand">
+                <el-button text class="tap-btn defer-more-btn" :loading="deferring">
+                  更多 ···
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="defer">今天先调整节奏</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
+            <el-button
+              v-else
+              text
+              type="info"
+              class="tap-btn defer-link"
+              :loading="deferring"
+              @click="askDefer"
+            >
+              今天先调整节奏
+            </el-button>
+            <p v-if="!kidMode" class="muted tip defer-hint">
+              调整节奏不删任务，只是今天不催（今日还可调整 {{ skipsLeft }} 次）
+            </p>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
     </div>
 
     <EmptyState
@@ -151,26 +188,23 @@
       </p>
     </div>
 
-    <div class="card-panel weekly-goal">
+    <!-- U2.1：主题压成一条，不抢下一件 -->
+    <div class="card-panel weekly-goal weekly-goal-compact">
       <div class="weekly-goal-head">
-        <strong>{{ weekThemeTitle || '本周主题' }}</strong>
+        <div class="weekly-goal-copy">
+          <strong>{{ weekThemeTitle || '本周主题' }}</strong>
+          <p v-if="weeklyGoalText" class="muted tiny" style="margin: 2px 0 0">
+            {{ weeklyGoalText }}
+          </p>
+          <p v-else-if="!weekThemeTitle" class="muted tiny" style="margin: 2px 0 0">
+            定一个主题，打卡更有章节感
+          </p>
+        </div>
         <el-button text type="primary" class="tap-btn" @click="themeDrawer = true">
           {{ weekThemeTitle || weeklyGoalText ? '去改' : '定一个' }}
         </el-button>
       </div>
-      <p v-if="weekThemeTitle" class="goal-text">
-        本周主题 · {{ weekThemeTitle }}
-      </p>
-      <p v-if="weeklyGoalText" class="muted tiny" style="margin: 6px 0 0">
-        小目标：{{ weeklyGoalText }}
-      </p>
-      <p v-else-if="!weekThemeTitle" class="muted tiny">
-        选一个本周主题，打卡会更有章节感，不只为分数。
-      </p>
       <div v-if="showPortfolioWeekendCta" class="portfolio-weekend-cta">
-        <p class="muted tiny" style="margin: 8px 0 0">
-          周末到了，去作品集收个尾，看看这周主题留下了什么。
-        </p>
         <el-button
           text
           type="primary"
@@ -178,33 +212,9 @@
           style="padding-left: 0"
           @click="$router.push({ path: '/student/growth', query: { tab: 'portfolio' } })"
         >
-          去成长作品集 ›
+          周末了，去作品集收个尾 ›
         </el-button>
       </div>
-    </div>
-
-    <JournalSoftTip
-      v-if="!isTv"
-      journal-path="/student/journal"
-      :age-band="ageBand"
-    />
-
-    <div
-      v-if="!isTv"
-      class="card-panel propose-strip"
-      role="button"
-      tabindex="0"
-      @click="openProposeDrawer"
-      @keydown.enter="openProposeDrawer"
-    >
-      <div class="propose-strip-head">
-        <strong>我想加一件小事</strong>
-        <span class="muted tiny">交给家长商量 ›</span>
-      </div>
-      <p class="muted tiny" style="margin: 6px 0 0">
-        <template v-if="pendingProposeHint">{{ pendingProposeHint }}</template>
-        <template v-else>不是立刻生效，家长同意后会出现在今日。</template>
-      </p>
     </div>
 
     <div
@@ -228,6 +238,35 @@
             ? `再靠近 ${today.nextWish.lackPoints} 就能商量兑现`
             : '可以和家长商量兑现啦'
         }}
+      </p>
+    </div>
+
+    <JournalSoftTip
+      v-if="!isTv"
+      journal-path="/student/journal"
+      :age-band="ageBand"
+    />
+
+    <div
+      v-if="!isTv"
+      class="card-panel propose-strip"
+      :class="{ 'propose-strip-prominent': agePack.proposeStripProminent }"
+      role="button"
+      tabindex="0"
+      @click="openProposeDrawer"
+      @keydown.enter="openProposeDrawer"
+    >
+      <div class="propose-strip-head">
+        <strong>{{
+          agePack.proposeStripProminent
+            ? '我想加一件小事（可以说了算一点）'
+            : '我想加一件小事'
+        }}</strong>
+        <span class="muted tiny">交给家长商量 ›</span>
+      </div>
+      <p class="muted tiny" style="margin: 6px 0 0">
+        <template v-if="pendingProposeHint">{{ pendingProposeHint }}</template>
+        <template v-else>不是立刻生效，家长同意后会出现在今日。</template>
       </p>
     </div>
 
@@ -552,9 +591,10 @@
             text
             type="primary"
             class="tap-btn"
+            :class="{ 'reorder-prominent': agePack.reorderProminent }"
             @click.stop="promoteItem(item)"
           >
-            先做这件
+            {{ agePack.reorderProminent ? '先做这件 ✓' : '先做这件' }}
           </el-button>
           <span class="go-hint" role="button" tabindex="0" @click="openCheckin(item)">去做</span>
         </div>
@@ -624,6 +664,8 @@
       :focus-reflection-chips="focusReflectionChips"
       :uploading="uploadingProof"
       :saving="saving"
+      :age-band="ageBand"
+      v-model:share-reflection-with-parent="shareReflectionWithParent"
       @submit="submit"
       @toggle-chip="toggleReflectChip"
       @toggle-focus-chip="toggleFocusReflectChip"
@@ -660,6 +702,7 @@
       @confirm="deferNext"
     />
     </template>
+    </template>
 
     <!-- 手机拇指热区：吸底主按钮，叠在底栏上方 -->
     <div
@@ -679,7 +722,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  onActivated,
+  onMounted,
+  onUnmounted,
+  reactive,
+  ref,
+  watch,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../../api/http'
@@ -705,12 +757,22 @@ import {
   type TimeSlot,
 } from '../../composables/timeSlotPolicy'
 import EmptyState from '../../components/EmptyState.vue'
-import CheckinCelebrate from '../../components/CheckinCelebrate.vue'
-import CheckinDrawer from '../../components/CheckinDrawer.vue'
-import FocusTimer from '../../components/FocusTimer.vue'
 import PageSkeleton from '../../components/PageSkeleton.vue'
-import SoftPrompt from '../../components/SoftPrompt.vue'
 import JournalSoftTip from '../../components/JournalSoftTip.vue'
+
+/** Heavy drawers / celebrate — split chunks; first paint stays list + CTA */
+const CheckinCelebrate = defineAsyncComponent(
+  () => import('../../components/CheckinCelebrate.vue'),
+)
+const CheckinDrawer = defineAsyncComponent(
+  () => import('../../components/CheckinDrawer.vue'),
+)
+const FocusTimer = defineAsyncComponent(
+  () => import('../../components/FocusTimer.vue'),
+)
+const SoftPrompt = defineAsyncComponent(
+  () => import('../../components/SoftPrompt.vue'),
+)
 import {
   applyFocusOrder,
   maxTodaySwaps,
@@ -731,6 +793,19 @@ import {
   flushOfflineQueue,
   queueOfflineCheckin,
 } from '../../composables/offlineCheckinQueue'
+import {
+  FADE_PACT_STUDENT_LINE,
+  dismissFadePactBanner,
+  shouldShowFadePactBanner,
+} from '../../composables/eduRelationCopy'
+import {
+  TEEN_WEAK_POINTS_STUDENT_TIP,
+  readReflectionSharePreference,
+  shouldOmitReflectionFromApi,
+  stashPrivateReflection,
+  writeReflectionSharePreference,
+} from '../../composables/teenPrivacy'
+import { getAgeContentPack } from '../../composables/ageContentPack'
 
 defineOptions({ name: 'StudentTodayView' })
 
@@ -739,6 +814,7 @@ const route = useRoute()
 const router = useRouter()
 const { isPhone, isTv } = useBreakpoint()
 const onboard = useStudentOnboarding()
+const fadePactTick = ref(0)
 /** Age band from family settings / today API */
 const ageBand = ref(localStorage.getItem('ageBand') || 'general')
 const slotExtendedEnabled = ref(localStorage.getItem('slotExtendedEnabled') === '1')
@@ -747,6 +823,7 @@ const slotClockEffective = ref<Record<string, { startHour: number; endHour: numb
 )
 const kidMode = computed(() => ageBand.value === 'young')
 const teenMode = computed(() => ageBand.value === 'teen')
+const agePack = computed(() => getAgeContentPack(ageBand.value))
 const visibleSlots = computed(() => slotOrderForUi(slotExtendedEnabled.value))
 const intrinsicMode = ref(false)
 const streakRhythmLabel = computed(() => {
@@ -783,7 +860,51 @@ const today = reactive<TodayBoardState>({
   skipsUsedToday: 0,
   digestSettlement: null,
 })
+const showFadePactBanner = computed(() => {
+  fadePactTick.value
+  return shouldShowFadePactBanner(today.rewardMode)
+})
+function onDismissFadePact() {
+  dismissFadePactBanner()
+  fadePactTick.value += 1
+}
+
+const KEY_TEEN_WEAK_TIP = 'xueji_teen_weak_tip_dismiss'
+const teenWeakTipTick = ref(0)
+const showTeenWeakPointsTip = computed(() => {
+  teenWeakTipTick.value
+  return (
+    teenMode.value &&
+    today.rewardMode === 'always' &&
+    !localStorage.getItem(KEY_TEEN_WEAK_TIP)
+  )
+})
+function onDismissTeenWeakTip() {
+  localStorage.setItem(KEY_TEEN_WEAK_TIP, '1')
+  teenWeakTipTick.value += 1
+}
+
+const shareReflectionWithParent = ref(
+  readReflectionSharePreference(localStorage.getItem('ageBand') || 'general'),
+)
+watch(ageBand, (b) => {
+  shareReflectionWithParent.value = readReflectionSharePreference(b)
+})
+watch(shareReflectionWithParent, (v) => {
+  if (ageBand.value === 'teen') writeReflectionSharePreference(v)
+})
+
 const loading = ref(true)
+/** U1.3：硬加载失败（空列表时显示错误态，避免假「做完」） */
+const loadError = ref(false)
+/** 并发硬加载计数：避免 soft 顶掉旧 hard 后 loading 卡死，或新 hard 被旧 finally 误关 */
+let hardLoadInFlight = 0
+
+function retryTodayLoad() {
+  void load()
+}
+/** U2.1：进度/专注默认收起，不占 Hero 预算 */
+const heroExtrasOpen = ref<string[]>([])
 const dlg = ref(false)
 const saving = ref(false)
 const uploadingProof = ref(false)
@@ -1173,6 +1294,7 @@ const showStickyDone = computed(
     isPhone.value &&
     !!nextItem.value &&
     !loading.value &&
+    !loadError.value &&
     !dlg.value &&
     !celebrate.visible,
 )
@@ -1217,10 +1339,14 @@ async function deferNext() {
 async function load(opts?: { soft?: boolean }) {
   const soft = !!opts?.soft
   const ticket = todayLoadGate.next()
-  if (!soft) loading.value = true
+  if (!soft) {
+    hardLoadInFlight += 1
+    loading.value = true
+  }
   try {
     const res: any = await http.get(soft ? '/my/today/lite' : '/my/today')
     if (!ticket.isCurrent()) return
+    loadError.value = false
     today.tasks = res.tasks
     today.planItems = res.planItems
     today.streak = res.streak || 0
@@ -1253,7 +1379,8 @@ async function load(opts?: { soft?: boolean }) {
       localStorage.setItem('ageBand', res.ageBand)
     }
     const sid = auth.user?.id
-    if (sid) {
+    // soft 只刷今日板；顺序/周主题/提案仅硬加载，避免可见性/轮询扇出
+    if (sid && !soft) {
       const [order, goalState] = await Promise.all([
         syncTodayOrderFromServer(sid),
         syncWeeklyGoalStateFromServer(sid),
@@ -1323,13 +1450,24 @@ async function load(opts?: { soft?: boolean }) {
     }
   } catch (e: any) {
     if (!ticket.isCurrent()) return
-    if (!soft) ElMessage.error(friendlyError(e, '今日列表暂时打不开，稍后再试'))
+    if (!soft) {
+      ElMessage.error(friendlyError(e, '今日列表暂时打不开，稍后再试'))
+      const empty =
+        !(today.tasks || []).length && !(today.planItems || []).length
+      if (empty) loadError.value = true
+    }
   } finally {
-    if (ticket.isCurrent() && !soft) loading.value = false
+    if (!soft) {
+      hardLoadInFlight = Math.max(0, hardLoadInFlight - 1)
+      if (hardLoadInFlight === 0) loading.value = false
+    }
   }
 }
 
-function openCheckin(item: TodoItem) {
+/** assignId → steps（列表不再带 steps，打开抽屉时按需拉取） */
+const stepsCache = new Map<number, Array<{ id: number | string; title: string }>>()
+
+async function openCheckin(item: TodoItem) {
   form.note = ''
   form.reflection = ''
   form.focusReflection = ''
@@ -1347,9 +1485,20 @@ function openCheckin(item: TodoItem) {
     form.planItemId = undefined
     form.targetType = t.targetType
     form.value = t.targetType === 'duration' ? t.targetValue : 1
-    form.steps = t.steps || []
+    form.steps = t.steps?.length ? t.steps : stepsCache.get(Number(t.assignId)) || []
     form.requireConfirm = !!t.requireConfirm
     formTitle.value = t.title
+    dlg.value = true
+    if (!form.steps.length && t.assignId) {
+      try {
+        const steps: any = await http.get(`/my/assigns/${t.assignId}/steps`)
+        const list = Array.isArray(steps) ? steps : []
+        stepsCache.set(Number(t.assignId), list)
+        if (form.assignId === t.assignId) form.steps = list
+      } catch {
+        /* ignore: drawer still usable without steps */
+      }
+    }
   } else {
     form.kind = 'plan'
     form.assignId = undefined
@@ -1359,8 +1508,8 @@ function openCheckin(item: TodoItem) {
     form.steps = []
     form.requireConfirm = false
     formTitle.value = item.title
+    dlg.value = true
   }
-  dlg.value = true
 }
 
 function openMakeup(h: any) {
@@ -1411,7 +1560,18 @@ function clearProofPhoto() {
 async function submit() {
   if (!tryBegin(saving)) return
   try {
-    const reflection = form.reflection?.trim() || ''
+    const reflectionRaw = form.reflection?.trim() || ''
+    const omitReflection = shouldOmitReflectionFromApi(
+      ageBand.value,
+      shareReflectionWithParent.value,
+    )
+    if (omitReflection && reflectionRaw) {
+      stashPrivateReflection({
+        text: reflectionRaw,
+        taskTitle: String(formTitle.value || ''),
+      })
+    }
+    const reflection = omitReflection ? '' : reflectionRaw
     const focusReflection = form.focusReflection?.trim() || ''
     const usedFocus = focusJustDone.value
     const clientId = crypto.randomUUID?.() || `c-${Date.now()}`
@@ -1437,6 +1597,15 @@ async function submit() {
       queueOfflineCheckin(body)
       dlg.value = false
       celebrate.message = '已记在本地，联网后会自动同步'
+      celebrate.growthHint = ''
+      celebrate.isInterest = false
+      celebrate.pointsAwarded = 0
+      celebrate.pointsBalance = today.pointsBalance
+      celebrate.streak = today.streak
+      celebrate.requireConfirm = false
+      celebrate.rewardMode = today.rewardMode || 'always'
+      celebrate.intrinsicMode = intrinsicMode.value
+      celebrate.nextWish = null
       celebrate.visible = true
       focusJustDone.value = false
       ElMessage.success('离线已保存，恢复网络后会同步')
@@ -1464,7 +1633,8 @@ async function submit() {
       reflectionPrompt.value = String(res.reflectionPrompt)
     }
     onboard.completeFromCheckin()
-    await load()
+    // 软刷新：避免硬 load 骨架屏拆掉庆祝层
+    await load({ soft: true })
   } catch (e: any) {
     ElMessage.error(friendlyError(e, '提交没成功，稍后再试'))
   } finally {
@@ -1523,6 +1693,51 @@ watch(
   border-radius: var(--young-radius, 20px);
   background: linear-gradient(165deg, var(--celebrate-warm, #fff6e8) 0%, #fff 55%);
 }
+.hero-meta {
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+.interest-inline {
+  color: var(--accent, #2f6f4e);
+  font-weight: 600;
+}
+.hero-meaning {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.hero-confirm-tip {
+  margin: 10px 0 0;
+}
+.hero-extras {
+  margin-top: 10px;
+  border: none;
+}
+.hero-extras :deep(.el-collapse-item__header) {
+  min-height: 40px;
+  height: auto;
+  line-height: 1.3;
+  border: none;
+  color: var(--accent-strong, #1f4d36);
+  font-size: 0.92rem;
+}
+.hero-extras :deep(.el-collapse-item__wrap) {
+  border: none;
+}
+.hero-extras :deep(.el-collapse-item__content) {
+  padding-bottom: 4px;
+}
+.hero-extras-title {
+  font-weight: 500;
+}
+.weekly-goal-compact {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.weekly-goal-copy {
+  min-width: 0;
+  flex: 1;
+}
 .kid-mode .page-title {
   font-family: var(--font-display);
   font-size: 1.55rem;
@@ -1559,6 +1774,15 @@ watch(
   justify-content: space-between;
   gap: 10px;
 }
+.fade-pact-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  border-color: rgba(100, 120, 90, 0.2);
+  background: linear-gradient(160deg, #f7faf5 0%, #fff 90%);
+}
 .encourage-banner {
   border-color: rgba(60, 120, 90, 0.22);
   background: linear-gradient(160deg, #f6fffa 0%, #fff 85%);
@@ -1590,6 +1814,18 @@ watch(
 .propose-strip {
   cursor: pointer;
   border-color: color-mix(in srgb, var(--accent, #3d8b6e) 18%, var(--line));
+}
+.propose-strip-prominent {
+  border-color: color-mix(in srgb, var(--accent, #3d8b6e) 35%, var(--line));
+  background: linear-gradient(160deg, #f3faf6 0%, #fff 80%);
+  box-shadow: 0 1px 0 rgba(61, 139, 110, 0.08);
+}
+.propose-strip-prominent strong {
+  font-size: 1.05rem;
+}
+.reorder-prominent {
+  font-weight: 700;
+  text-decoration: underline;
 }
 .propose-strip-head {
   display: flex;

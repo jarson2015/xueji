@@ -45,7 +45,7 @@ async function mockJournalApi(
         id: 10,
         authorId: 2,
         authorName: '小明',
-        body: '刚写的可编辑帖',
+        body: '刚写的可编辑�?,
         visibility: 'family',
         commentCount: 0,
         canEdit: true,
@@ -55,7 +55,7 @@ async function mockJournalApi(
         id: 9,
         authorId: 2,
         authorName: '小明',
-        body: '超时不可编辑帖',
+        body: '超时不可编辑�?,
         visibility: 'family',
         commentCount: 0,
         canEdit: false,
@@ -193,7 +193,7 @@ async function mockJournalApi(
 }
 
 test.describe('学迹家庭说说 P1 回归', () => {
-  test('关闭私密：SoftPrompt → 确认后只读保留', async ({ page }) => {
+  test('关闭私密：SoftPrompt �?确认后只读保�?, async ({ page }) => {
     await mockJournalApi(page, {
       diary: {
         enabled: true,
@@ -213,33 +213,33 @@ test.describe('学迹家庭说说 P1 回归', () => {
     await expect(page.getByText('我的私密日记')).toBeVisible({ timeout: 15_000 })
     await page.getByText('我的私密日记').click()
     await page.getByRole('button', { name: '关闭私密日记' }).click()
-    await expect(page.getByRole('heading', { name: '关闭私密日记？' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '关闭私密日记�? })).toBeVisible()
     await expect(page.locator('.sp-msg')).toContainText('只读')
     await page.getByRole('button', { name: '确认关闭' }).click()
-    await expect(page.getByText(/已关闭 · 只读保留/)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/已关�?· 只读保留/)).toBeVisible({ timeout: 10_000 })
     await expect(page.getByText('保留的旧日记')).toBeVisible()
   })
 
-  test('短时编辑：可编辑帖有按钮；超时帖无编辑', async ({ page }) => {
+  test('短时编辑：可编辑帖有按钮；超时帖无编�?, async ({ page }) => {
     await mockJournalApi(page)
     await seedStudent(page)
     await page.goto('/student/journal')
-    await expect(page.getByText('刚写的可编辑帖')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('刚写的可编辑�?)).toBeVisible({ timeout: 15_000 })
 
-    const editableCard = page.locator('.post-card').filter({ hasText: '刚写的可编辑帖' })
+    const editableCard = page.locator('.post-card').filter({ hasText: '刚写的可编辑�? })
     await expect(editableCard.getByRole('button', { name: '编辑' })).toBeVisible()
 
-    const staleCard = page.locator('.post-card').filter({ hasText: '超时不可编辑帖' })
+    const staleCard = page.locator('.post-card').filter({ hasText: '超时不可编辑�? })
     await expect(staleCard.getByRole('button', { name: '编辑' })).toHaveCount(0)
 
     await editableCard.getByRole('button', { name: '编辑' }).click()
     await expect(page.getByText('编辑手账')).toBeVisible()
     await page.locator('.el-drawer').getByRole('textbox').fill('已改好的手账')
     await page.getByRole('button', { name: '保存修改' }).click()
-    await expect(page.getByText('已保存')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('已保�?)).toBeVisible({ timeout: 10_000 })
   })
 
-  test('More：有新回应时家庭说说带角标', async ({ page }) => {
+  test('More：有新回应时家庭说说带角�?, async ({ page }) => {
     await mockJournalApi(page, { newReplyCount: 3 })
     await seedStudent(page)
     await page.goto('/student/more')

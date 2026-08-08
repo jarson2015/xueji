@@ -25,7 +25,7 @@ test.describe('学迹邀请码入口', () => {
 
     await page.goto('/parent/students')
     // 家庭协作默认折叠时展开
-    const collab = page.getByText('邀请另一位家长')
+    const collab = page.getByText('邀请另一位家�?)
     await expect(collab).toBeVisible({ timeout: 15_000 })
     await collab.click()
     await expect(page.getByRole('button', { name: '生成邀请码' })).toBeVisible()

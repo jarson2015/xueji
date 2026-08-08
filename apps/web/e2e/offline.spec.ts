@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function loginStudent(page: Page) {
   await page.goto('/login')

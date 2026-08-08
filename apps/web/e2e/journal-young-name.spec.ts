@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function loginStudent(page: Page) {
   await page.goto('/login')
@@ -20,7 +20,7 @@ async function loginStudent(page: Page) {
 }
 
 test.describe('学迹家庭说说分龄命名', () => {
-  test('幼龄：More / 页标题为「给家人看」', async ({ page }) => {
+  test('幼龄：More / 页标题为「给家人看�?, async ({ page }) => {
     await page.route('**/api/journal/posts**', async (route) => {
       await route.fulfill({
         status: 200,
@@ -62,7 +62,7 @@ test.describe('学迹家庭说说分龄命名', () => {
     await expect(page).toHaveURL(/\/student\/journal/)
     await expect(page.locator('h2.page-title')).toHaveText('给家人看')
     await expect(page.getByText(/写给家人看的小事/)).toBeVisible()
-    await page.getByText('我的悄悄话').click()
-    await expect(page.getByRole('button', { name: '自愿开启' })).toBeVisible()
+    await page.getByText('我的悄悄�?).click()
+    await expect(page.getByRole('button', { name: '自愿开�? })).toBeVisible()
   })
 })

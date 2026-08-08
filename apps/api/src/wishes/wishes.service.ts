@@ -5,7 +5,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, Not, Repository } from 'typeorm';
 import { WishItem } from '../entities/wish-item.entity';
 import { WishRedeem } from '../entities/wish-redeem.entity';
 import { User } from '../entities/user.entity';
@@ -66,6 +66,7 @@ export class WishesService {
       where: { studentId: In(studentIds) },
       relations: ['student'],
       order: { id: 'DESC' },
+      take: 100,
     });
   }
 
@@ -163,7 +164,9 @@ export class WishesService {
     );
     const student = await this.users.findOne({ where: { id: studentId } });
     this.events.emitToParents(parents, 'wish:proposed', {
-      wish,
+      wishId: wish.id,
+      studentId,
+      title: wish.title,
       studentName: student?.name || '孩子',
       message: `${student?.name || '孩子'}提了一个愿望，请定积分后上架`,
     });
@@ -204,16 +207,14 @@ export class WishesService {
     const wish = await this.wishes.findOne({ where: { id: wishId } });
     if (!wish) throw new NotFoundException('愿望不存在');
     await this.students.assertBound(parentId, wish.studentId);
+    if (wish.proposed && dto.active === true) {
+      throw new BadRequestException('待审定愿望请通过「审定上架」接口上架');
+    }
     if (dto.title !== undefined) wish.title = dto.title;
     if (dto.costPoints !== undefined) wish.costPoints = dto.costPoints;
     if (dto.active !== undefined) wish.active = dto.active;
     if (dto.type !== undefined) wish.type = dto.type;
     if (dto.kind !== undefined) wish.kind = dto.kind;
-    if (dto.proposed !== undefined) wish.proposed = dto.proposed;
-    // Shelving a proposal via active=true clears proposed
-    if (dto.active === true && wish.proposed) {
-      wish.proposed = false;
-    }
     if (dto.isNearTerm !== undefined) {
       if (dto.isNearTerm && wish.active && !wish.proposed) {
         await this.assertNearTermRoom(wish.studentId, wish.id);
@@ -284,8 +285,13 @@ export class WishesService {
       );
       const parentIds = await this.students.getParentIdsOfStudent(studentId);
       this.events.emitToParents(parentIds, 'redeem:requested', {
-        redeem,
-        wish,
+        redeem: {
+          id: redeem.id,
+          studentId,
+          costPoints: redeem.costPoints,
+          createdAt: redeem.createdAt,
+        },
+        wish: { title: wish.title },
         studentName: student.name,
         pointsBalance: balance,
       });
@@ -305,17 +311,28 @@ export class WishesService {
   async listRedeems(parentId: number) {
     const studentIds = await this.students.getStudentIdsOfParent(parentId);
     if (!studentIds.length) return [];
-    const rows = await this.redeems.find({
-      where: { studentId: In(studentIds) },
-      relations: ['wish', 'student'],
-      order: { createdAt: 'DESC' },
-    });
-    return rows.sort((a, b) => {
-      const ap = a.status === RedeemStatus.PENDING ? 0 : 1;
-      const bp = b.status === RedeemStatus.PENDING ? 0 : 1;
-      if (ap !== bp) return ap - bp;
-      return b.createdAt.getTime() - a.createdAt.getTime();
-    });
+    // pending 优先（上限 50）+ 近期历史 50，避免全表膨胀
+    const [pending, history] = await Promise.all([
+      this.redeems.find({
+        where: {
+          studentId: In(studentIds),
+          status: RedeemStatus.PENDING,
+        },
+        relations: ['wish', 'student'],
+        order: { createdAt: 'DESC' },
+        take: 50,
+      }),
+      this.redeems.find({
+        where: {
+          studentId: In(studentIds),
+          status: Not(RedeemStatus.PENDING),
+        },
+        relations: ['wish', 'student'],
+        order: { createdAt: 'DESC' },
+        take: 50,
+      }),
+    ]);
+    return [...pending, ...history];
   }
 
   async listRedeemsForStudent(studentId: number) {

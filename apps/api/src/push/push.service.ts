@@ -81,23 +81,29 @@ export class PushService implements OnModuleInit {
       url: payload.url || '/',
       tag: payload.tag || 'study-nudge',
     });
-    for (const row of rows) {
-      try {
-        await webpush.sendNotification(
-          {
-            endpoint: row.endpoint,
-            keys: { p256dh: row.p256dh, auth: row.auth },
-          },
-          body,
-        );
-        sent += 1;
-      } catch (e: any) {
-        const status = e?.statusCode;
-        this.logger.warn(`Push failed user=${userId} status=${status}`);
-        if (status === 404 || status === 410) {
-          await this.subs.delete({ id: row.id });
+    const results = await Promise.allSettled(
+      rows.map(async (row) => {
+        try {
+          await webpush.sendNotification(
+            {
+              endpoint: row.endpoint,
+              keys: { p256dh: row.p256dh, auth: row.auth },
+            },
+            body,
+          );
+          return { ok: true as const };
+        } catch (e: any) {
+          const status = e?.statusCode;
+          this.logger.warn(`Push failed user=${userId} status=${status}`);
+          if (status === 404 || status === 410) {
+            await this.subs.delete({ id: row.id });
+          }
+          return { ok: false as const };
         }
-      }
+      }),
+    );
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value.ok) sent += 1;
     }
     return { sent, skipped: false };
   }

@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { StudyPlan } from '../entities/study-plan.entity';
 import { PlanItem } from '../entities/plan-item.entity';
+import { TaskAssign } from '../entities/task-assign.entity';
 import {
   CreatePlanDto,
   CreatePlanItemDto,
@@ -16,14 +21,46 @@ export class PlansService {
   constructor(
     @InjectRepository(StudyPlan) private readonly plans: Repository<StudyPlan>,
     @InjectRepository(PlanItem) private readonly items: Repository<PlanItem>,
+    @InjectRepository(TaskAssign)
+    private readonly assigns: Repository<TaskAssign>,
   ) {}
 
-  list(studentId: number) {
-    return this.plans.find({
+  /**
+   * List plans for Me page. Cap plans; items = open / undated / recent only
+   * (PERF P6 — avoid loading years of done history).
+   */
+  async list(studentId: number) {
+    const plans = await this.plans.find({
       where: { studentId },
-      relations: ['items', 'items.task'],
       order: { id: 'DESC' },
+      take: 30,
     });
+    if (!plans.length) return [];
+    const since = new Date();
+    since.setDate(since.getDate() - 14);
+    const sinceKey = todayStr(since);
+    const planIds = plans.map((p) => p.id);
+    const items = await this.items
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.task', 'task')
+      .where('item.planId IN (:...planIds)', { planIds })
+      .andWhere(
+        '(item.done = :open OR item.plannedDate IS NULL OR item.plannedDate >= :since)',
+        { open: false, since: sinceKey },
+      )
+      .orderBy('item.id', 'DESC')
+      .getMany();
+    const byPlan = new Map<number, typeof items>();
+    for (const it of items) {
+      const list = byPlan.get(it.planId) || [];
+      if (list.length >= 40) continue;
+      list.push(it);
+      byPlan.set(it.planId, list);
+    }
+    return plans.map((p) => ({
+      ...p,
+      items: byPlan.get(p.id) || [],
+    }));
   }
 
   async create(studentId: number, dto: CreatePlanDto) {
@@ -57,10 +94,14 @@ export class PlansService {
 
   async addItem(studentId: number, planId: number, dto: CreatePlanItemDto) {
     await this.getOwned(studentId, planId);
+    const taskId = dto.taskId ?? null;
+    if (taskId != null) {
+      await this.assertTaskAssignedToStudent(studentId, taskId);
+    }
     const item = await this.items.save(
       this.items.create({
         planId,
-        taskId: dto.taskId ?? null,
+        taskId,
         customTitle: dto.customTitle ?? null,
         plannedDate: dto.plannedDate ?? todayStr(),
         done: false,
@@ -103,28 +144,51 @@ export class PlansService {
     for (const sid of studentIds) result.set(sid, []);
     if (!studentIds.length) return result;
     const today = todayStr();
-    const plans = await this.plans.find({
-      where: { studentId: In(studentIds) },
-      relations: ['items', 'items.task'],
-    });
-    for (const p of plans) {
+    // DB 过滤今日/未排期未完成，避免拉全历史 items
+    const items = await this.items
+      .createQueryBuilder('it')
+      .innerJoinAndSelect('it.plan', 'plan')
+      .leftJoin('it.task', 'task')
+      .addSelect(['task.id', 'task.title'])
+      .where('plan.studentId IN (:...studentIds)', { studentIds })
+      .andWhere(
+        '(it.plannedDate = :today OR (it.plannedDate IS NULL AND it.done = :doneFalse))',
+        { today, doneFalse: false },
+      )
+      .getMany();
+    for (const it of items) {
+      const p = it.plan;
+      if (!p) continue;
       const list = result.get(p.studentId) || [];
-      for (const it of p.items || []) {
-        if (it.plannedDate === today || (!it.plannedDate && !it.done)) {
-          list.push({
-            type: 'plan',
-            planId: p.id,
-            planTitle: p.title,
-            planItemId: it.id,
-            title: it.customTitle || it.task?.title || '计划项',
-            done: it.done,
-            taskId: it.taskId,
-          });
-        }
-      }
+      list.push({
+        type: 'plan',
+        planId: p.id,
+        planTitle: p.title,
+        planItemId: it.id,
+        title: it.customTitle || it.task?.title || '计划项',
+        done: it.done,
+        taskId: it.taskId,
+      });
       result.set(p.studentId, list);
     }
     return result;
+  }
+
+  /** Plan items may only link tasks already assigned to this student. */
+  private async assertTaskAssignedToStudent(
+    studentId: number,
+    taskId: number,
+  ) {
+    if (!Number.isFinite(taskId) || taskId <= 0) {
+      throw new BadRequestException('只能选择已指派给你的任务');
+    }
+    const assign = await this.assigns.findOne({
+      where: { studentId, taskId },
+      relations: ['task'],
+    });
+    if (!assign?.task?.active) {
+      throw new BadRequestException('只能选择已指派给你的任务');
+    }
   }
 
   private async getOwned(studentId: number, planId: number) {

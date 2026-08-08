@@ -40,7 +40,7 @@ test.describe('学迹家长兑现 SoftPrompt', () => {
             student: { id: 1, name: '小明' },
             wish: {
               id: 77,
-              title: '今日互助卡',
+              title: '今日互助�?,
               type: 'golden_finger',
             },
           },
@@ -67,16 +67,16 @@ test.describe('学迹家长兑现 SoftPrompt', () => {
     })
 
     await page.goto('/parent/wishes')
-    await expect(page.getByRole('heading', { name: /待兑现/ })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /待兑�? })).toBeVisible({
       timeout: 15_000,
     })
-    await expect(page.getByText('家庭互助卡').first()).toBeVisible()
+    await expect(page.getByText('家庭互助�?).first()).toBeVisible()
 
     await page.getByRole('button', { name: '兑现' }).first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await expect(
-      page.getByRole('heading', { name: '兑现家庭互助卡' }),
+      page.getByRole('heading', { name: '兑现家庭互助�? }),
     ).toBeVisible()
     await expect(dialog.locator('.sp-msg')).toContainText(/免做不是责任消失/)
     await expect(dialog.locator('.sp-chip', { hasText: '洗碗' })).toBeVisible()

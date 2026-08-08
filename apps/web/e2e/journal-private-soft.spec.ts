@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function loginStudent(page: Page) {
   await page.goto('/login')
@@ -64,12 +64,12 @@ test.describe('学迹家庭手账私密 SoftPrompt P1', () => {
     await page.goto('/student/journal')
     await expect(page.getByText('我的私密日记')).toBeVisible({ timeout: 15_000 })
     await page.getByText('我的私密日记').click()
-    await page.getByRole('button', { name: '自愿开启' }).click()
-    await expect(page.getByRole('heading', { name: '自愿开启私密日记' })).toBeVisible()
-    await expect(page.getByText(/只有你本人/)).toBeVisible()
+    await page.getByRole('button', { name: '自愿开�? }).click()
+    await expect(page.getByRole('heading', { name: '自愿开启私密日�? })).toBeVisible()
+    await expect(page.getByText(/只有你本�?)).toBeVisible()
     await expect(page.getByText(/代登/)).toBeVisible()
-    await page.getByRole('button', { name: '再想想' }).click()
-    await expect(page.getByRole('heading', { name: '自愿开启私密日记' })).toHaveCount(0)
+    await page.getByRole('button', { name: '再想�? }).click()
+    await expect(page.getByRole('heading', { name: '自愿开启私密日�? })).toHaveCount(0)
   })
 
   test('关闭私密 SoftPrompt 含只读口径；发帖话术芯片可见', async ({ page }) => {
@@ -98,11 +98,11 @@ test.describe('学迹家庭手账私密 SoftPrompt P1', () => {
     await expect(page.getByText('我的私密日记')).toBeVisible({ timeout: 15_000 })
     await page.getByText('我的私密日记').click()
     await page.getByRole('button', { name: '关闭私密日记' }).click()
-    await expect(page.getByRole('heading', { name: '关闭私密日记？' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '关闭私密日记�? })).toBeVisible()
     await expect(page.locator('.sp-msg')).toContainText('只读')
-    await page.getByRole('button', { name: '保持开启' }).click()
+    await page.getByRole('button', { name: '保持开�? }).click()
 
-    await page.getByRole('button', { name: '写一条' }).click()
-    await expect(page.getByRole('button', { name: '今天骄傲的一件小事' })).toBeVisible()
+    await page.getByRole('button', { name: '写一�? }).click()
+    await expect(page.getByRole('button', { name: '今天骄傲的一件小�? })).toBeVisible()
   })
 })

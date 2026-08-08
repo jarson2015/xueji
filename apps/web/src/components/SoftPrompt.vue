@@ -37,8 +37,17 @@
           class="sp-input"
         />
         <p v-if="requireNote && showInput && !note.trim()" class="sp-hint">{{ hint || '写一句给对方，沟通更顺畅' }}</p>
+        <details v-if="optionalNote?.trim()" class="sp-optional">
+          <summary>可选说明</summary>
+          <p class="sp-optional-body">{{ optionalNote }}</p>
+        </details>
         <div class="sp-actions">
-          <el-button class="tap-btn" :class="{ 'full-tap': kidMode }" @click="onCancel">
+          <el-button
+            plain
+            class="tap-btn"
+            :class="{ 'full-tap': kidMode }"
+            @click="onCancel"
+          >
             {{ cancelText }}
           </el-button>
           <el-button
@@ -75,6 +84,8 @@ const props = withDefaults(
     kidMode?: boolean
     /** Override default require-note hint */
     hint?: string
+    /** U3.2：较长说明默认折叠 */
+    optionalNote?: string
   }>(),
   {
     message: '',
@@ -87,6 +98,7 @@ const props = withDefaults(
     initialNote: '',
     kidMode: false,
     hint: '',
+    optionalNote: '',
   },
 )
 
@@ -195,9 +207,25 @@ function onConfirm() {
 .sp-card {
   width: min(420px, 100%);
   background: #fff;
-  border-radius: 18px;
+  border-radius: var(--radius, 16px);
   padding: 20px 18px 14px;
   box-shadow: 0 12px 40px rgba(28, 43, 36, 0.2);
+  animation: soft-fade var(--motion-fast, 0.35s) ease;
+}
+@keyframes soft-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-card {
+    animation: none;
+  }
 }
 .sp-card.kid {
   padding: 24px 20px 16px;
@@ -245,6 +273,25 @@ function onConfirm() {
   margin: 0 0 8px;
   font-size: 0.85rem;
   color: var(--warn);
+}
+.sp-optional {
+  margin: 4px 0 8px;
+  border-radius: 10px;
+  background: var(--accent-soft, #d8ebe0);
+  padding: 8px 10px;
+}
+.sp-optional summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--accent-strong, #1f4d36);
+  font-weight: 500;
+}
+.sp-optional-body {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+  color: var(--muted, #666);
+  line-height: 1.45;
+  white-space: pre-line;
 }
 .sp-actions {
   display: flex;

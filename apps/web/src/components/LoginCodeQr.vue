@@ -18,7 +18,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 async function render() {
   const canvas = canvasRef.value
   const code = String(props.code || '').trim()
-  if (!canvas || code.length !== 6) return
+  if (!canvas || !/^\d{6,8}$/.test(code)) return
   const url = `${window.location.origin}/login?code=${encodeURIComponent(code)}`
   await QRCode.toCanvas(canvas, url, {
     width: 168,

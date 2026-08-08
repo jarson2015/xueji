@@ -2,11 +2,13 @@
 # 工作目录：/vol1/1000/www/xueji
 #
 # 必须是「文件」不是目录：
-#   nginx-web.conf
+#   nginx.conf          （推荐：含 limit_req + TRUST_PROXY 转发头）
 #   api/docker-start.sh
 # 若曾被 Docker 建成空目录：
-#   rm -rf nginx-web.conf nginx.conf
-#   再重新上传这两个文件
+#   rm -rf nginx.conf nginx-web.conf
+#   再重新上传 nginx.conf
+#
+# 安全：API 不映射宿主机 3000（仅容器网内供 web 反代）；经 Nginx 时 TRUST_PROXY=1。
 #
 #   docker compose -f docker-compose.fnos.yml --env-file .env up -d
 
@@ -39,14 +41,17 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:study@localhost}
+      # 经 study-web Nginx 反代时必须开启，限流才用真实客户端 IP
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       npm_config_registry: https://registry.npmmirror.com
     volumes:
       - /vol1/1000/www/xueji/api:/app
       - /vol1/1000/www/xueji/data/uploads:/app/uploads
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "3000:3000"
+    # 不映射宿主机端口，避免绕过 Nginx limit_req
+    expose:
+      - "3000"
     command: ["sh", "/app/docker-start.sh"]
     healthcheck:
       test:
@@ -72,9 +77,6 @@ services:
     user: "0:0"
     volumes:
       - /vol1/1000/www/xueji/web:/usr/share/nginx/html:ro
-      - /vol1/1000/www/xueji/nginx-web.conf:/etc/nginx/conf.d/default.conf:ro
-    # 单行命令，无 heredoc / 无复杂引号
-    command:
-      - sh
-      - -c
-      - sed -i 's/^user  nginx;/user  root;/' /etc/nginx/nginx.conf; exec nginx -g 'daemon off;'
+      # 整份 nginx.conf（含 limit_req_zone）；勿只挂 conf.d 而丢掉 zone 定义
+      - /vol1/1000/www/xueji/nginx.conf:/etc/nginx/nginx.conf:ro
+    command: ["nginx", "-g", "daemon off;"]

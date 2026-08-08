@@ -80,12 +80,6 @@ export class UpdateWishDto {
   @IsEnum(WishKind)
   kind?: WishKind;
 
-  /** Parent clears proposed when shelving */
-  @IsOptional()
-  @ToBoolean()
-  @IsBoolean()
-  proposed?: boolean;
-
   @IsOptional()
   @ToBoolean()
   @IsBoolean()

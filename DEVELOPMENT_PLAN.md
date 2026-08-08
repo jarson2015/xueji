@@ -57,10 +57,13 @@
 
 ## 下一步候选
 
-- **V1.5 成就奖金**（可选）：成绩/名次现金奖励，走 `kind=bonus`，与积分隔离；见 [`docs/V1_ALLOWANCE_LEDGER.md`](./docs/V1_ALLOWANCE_LEDGER.md) §9。
+- ~~**E6 验收加固**~~：工程完成（真机待勾）— [`docs/EDU_E6_HARDENING_PLAN.md`](./docs/EDU_E6_HARDENING_PLAN.md)。
+- ~~**V1.5 成就奖金**~~：工程完成（需跑迁移）— [`docs/V1_5_ACHIEVEMENT_BONUS_PLAN.md`](./docs/V1_5_ACHIEVEMENT_BONUS_PLAN.md)。
+- 总索引：[`docs/NEXT_TRACK_INDEX.md`](./docs/NEXT_TRACK_INDEX.md)。
 - ~~**V1 零花钱账本**~~：已落地（开关默认关；演示小明已开）。
 - ~~**投入使用 polish**~~：周汇总可见、反思对齐 API、EmptyState/friendlyError、teen 分龄、引导挂钩数据、情商模板分组、nudge 可编辑、先缓缓和解提示、消费可选反思。
 - ~~**P0 上线门禁**~~：生产关 seed/demo-hints、CORS 强制、Compose 密钥必填、登录去预填、引导发码步修正。
+- ~~**分龄情绪 E1–E5**~~：已完成 — 见 [`docs/EDU_AGE_EMOTION_ROADMAP.md`](./docs/EDU_AGE_EMOTION_ROADMAP.md)。
 
 ---
 

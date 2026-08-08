@@ -273,10 +273,8 @@ async function save() {
       makeupDiscountPercent: makeupDiscount.value,
       makeupWindowDays: makeupWindow.value,
     }
-    const saved: any = await http.put('/family/settings', {
-      ...settingsSnapshot.value,
-      ...restPatch,
-    })
+    // Only this page's fields — PUT is patch-merge on the server
+    const saved: any = await http.put('/family/settings', restPatch)
     settingsSnapshot.value = settingsToPutPayload(saved || {
       ...settingsSnapshot.value,
       ...restPatch,

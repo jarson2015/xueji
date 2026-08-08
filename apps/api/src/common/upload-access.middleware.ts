@@ -4,8 +4,9 @@ import { existsSync } from 'fs';
 import { verifyUploadAccess } from './upload-url';
 
 /**
- * Serve `/uploads/:file` only when `?exp=&sig=` HMAC is valid.
- * Replaces open `useStaticAssets` for child proof photos.
+ * Serve `/uploads/:file` only when `?exp=&uid=&sig=` HMAC is valid.
+ * Signature is bound to the viewer id that was used when the API signed the URL
+ * (img tags still work without Bearer; unbound/legacy sigs are rejected).
  */
 export function createUploadAccessMiddleware(uploadDir: string) {
   const root = join(process.cwd(), uploadDir);
@@ -22,7 +23,8 @@ export function createUploadAccessMiddleware(uploadDir: string) {
     const pathname = `/uploads/${file}`;
     const exp = typeof req.query.exp === 'string' ? req.query.exp : undefined;
     const sig = typeof req.query.sig === 'string' ? req.query.sig : undefined;
-    if (!verifyUploadAccess(pathname, exp, sig)) {
+    const uid = typeof req.query.uid === 'string' ? req.query.uid : undefined;
+    if (!verifyUploadAccess(pathname, exp, sig, uid)) {
       res.status(401).json({
         code: 401,
         message: '图片链接无效或已过期，请刷新页面后重试',

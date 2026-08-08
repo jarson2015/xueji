@@ -351,8 +351,12 @@ export class CheckinsService {
           assignId: assign?.id ?? null,
           planItemId: checkin.planItemId,
           taskTitle,
-          note: checkin.note,
-          imageUrl: checkin.imageUrl,
+          note: checkin.note
+            ? String(checkin.note).slice(0, 120)
+            : checkin.note,
+          // WS 不推图片 URL；列表靠 soft/ETag 补全
+          imageUrl: null,
+          hasImage: !!checkin.imageUrl,
           confirmStatus: checkin.confirmStatus,
           isMakeup,
           createdAt: checkin.createdAt,
@@ -654,6 +658,12 @@ export class CheckinsService {
     checkinId: number,
     dto: ConfirmCheckInDto,
     actorName?: string,
+    opts?: {
+      /** Batch path already verified parent↔student binding */
+      skipBoundCheck?: boolean;
+      /** Preloaded policy from CheckinPolicyReader.forStudents */
+      policy?: Awaited<ReturnType<CheckinPolicyReader['forStudent']>>;
+    },
   ) {
     if (dto.action === 'reject' && !dto.note?.trim()) {
       throw new BadRequestException('请写一句给孩子，沟通更顺畅');
@@ -664,7 +674,9 @@ export class CheckinsService {
         relations: ['task'],
       });
       if (!checkin) throw new NotFoundException('打卡不存在');
-      await this.students.assertBound(parentId, checkin.studentId);
+      if (!opts?.skipBoundCheck) {
+        await this.students.assertBound(parentId, checkin.studentId);
+      }
       if (checkin.confirmStatus !== ConfirmStatus.PENDING) {
         throw new BadRequestException('该打卡无需确认或已处理');
       }
@@ -703,7 +715,9 @@ export class CheckinsService {
           let pts = assign.task.pointsReward;
           let reason = PointReason.CHECKIN;
           let rewardSkipped = false;
-          const policy = await this.checkinPolicy.forStudent(checkin.studentId);
+          const policy =
+            opts?.policy ||
+            (await this.checkinPolicy.forStudent(checkin.studentId));
           if (checkin.isMakeup) {
             pts = calcMakeupPoints(
               assign.task.pointsReward,
@@ -914,40 +928,119 @@ export class CheckinsService {
     const skipMakeup = dto.skipMakeup !== false;
     const ok: number[] = [];
     const failed: Array<{ id: number; message: string }> = [];
+    const ids = Array.isArray(dto.ids) ? dto.ids.slice(0, 40) : [];
+    if (!ids.length) {
+      return { ok, failed, okCount: 0, failCount: 0 };
+    }
 
-    for (const id of dto.ids) {
-      try {
-        if (skipMakeup) {
-          const row = await this.checkins.findOne({ where: { id } });
-          if (row?.isMakeup) {
-            failed.push({ id, message: '补上进度请单条确认' });
-            continue;
+    // One load + one binding set + batch policy (not N× find/assertBound/forStudent)
+    const uniqueIds = [...new Set(ids)];
+    const rows = await this.checkins.find({
+      where: { id: In(uniqueIds) },
+      relations: ['task'],
+    });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const boundSids = new Set(
+      await this.students.getStudentIdsOfParent(parentId),
+    );
+    const studentIds = [
+      ...new Set(
+        rows
+          .filter((r) => boundSids.has(r.studentId))
+          .map((r) => r.studentId),
+      ),
+    ];
+    const bundles = studentIds.length
+      ? await this.checkinPolicy.forStudents(studentIds)
+      : new Map();
+
+    // Group by student: parallel across kids, serial within (points/progress race-safe)
+    const byStudent = new Map<number, number[]>();
+    for (const id of ids) {
+      const row = byId.get(id);
+      if (!row) {
+        failed.push({ id, message: '打卡不存在' });
+        continue;
+      }
+      if (!boundSids.has(row.studentId)) {
+        failed.push({ id, message: '未绑定该学生' });
+        continue;
+      }
+      if (skipMakeup && row.isMakeup) {
+        failed.push({ id, message: '补上进度请单条确认' });
+        continue;
+      }
+      const list = byStudent.get(row.studentId) || [];
+      list.push(id);
+      byStudent.set(row.studentId, list);
+    }
+
+    const groups = [...byStudent.entries()];
+    const CONCURRENCY = 4;
+    if (groups.length) {
+      const groupResults: Array<{
+        ok: number[];
+        failed: Array<{ id: number; message: string }>;
+      }> = new Array(groups.length);
+
+      let nextGroup = 0;
+      const workers = Array.from(
+        { length: Math.min(CONCURRENCY, groups.length) },
+        async () => {
+          while (true) {
+            const gi = nextGroup++;
+            if (gi >= groups.length) return;
+            const [, idList] = groups[gi];
+            const localOk: number[] = [];
+            const localFail: Array<{ id: number; message: string }> = [];
+            for (const id of idList) {
+              try {
+                const row = byId.get(id)!;
+                const bundle = bundles.get(row.studentId);
+                const policy = bundle
+                  ? {
+                      edu: bundle.edu,
+                      makeup: bundle.makeup,
+                      rest: bundle.rest,
+                      slots: bundle.slots,
+                    }
+                  : undefined;
+                await this.confirm(
+                  parentId,
+                  id,
+                  {
+                    action: dto.action,
+                    note: dto.note,
+                    liked: dto.liked,
+                  },
+                  actorName,
+                  { skipBoundCheck: true, policy },
+                );
+                localOk.push(id);
+              } catch (e) {
+                let message = '失败';
+                if (e instanceof HttpException) {
+                  const r = e.getResponse();
+                  if (typeof r === 'string') message = r;
+                  else if (r && typeof r === 'object' && 'message' in r) {
+                    const m = (r as { message: string | string[] }).message;
+                    message = Array.isArray(m) ? m.join('; ') : String(m);
+                  } else message = e.message;
+                } else if (e instanceof Error) {
+                  message = e.message;
+                }
+                localFail.push({ id, message });
+              }
+            }
+            groupResults[gi] = { ok: localOk, failed: localFail };
           }
-        }
-        await this.confirm(
-          parentId,
-          id,
-          {
-            action: dto.action,
-            note: dto.note,
-            liked: dto.liked,
-          },
-          actorName,
-        );
-        ok.push(id);
-      } catch (e) {
-        let message = '失败';
-        if (e instanceof HttpException) {
-          const r = e.getResponse();
-          if (typeof r === 'string') message = r;
-          else if (r && typeof r === 'object' && 'message' in r) {
-            const m = (r as { message: string | string[] }).message;
-            message = Array.isArray(m) ? m.join('; ') : String(m);
-          } else message = e.message;
-        } else if (e instanceof Error) {
-          message = e.message;
-        }
-        failed.push({ id, message });
+        },
+      );
+      await Promise.all(workers);
+      for (const gr of groupResults) {
+        if (!gr) continue;
+        ok.push(...gr.ok);
+        failed.push(...gr.failed);
       }
     }
 

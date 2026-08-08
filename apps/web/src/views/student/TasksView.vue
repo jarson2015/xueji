@@ -303,26 +303,27 @@ async function load(opts?: { soft?: boolean }) {
   const ticket = tasksLoadGate.next()
   if (!soft) loading.value = true
   try {
-    const [tasks, today] = await Promise.all([
-      http.get('/my/tasks'),
-      http.get(soft ? '/my/today/lite' : '/my/today'),
-    ])
+    // soft：只刷任务列表；休息日/时段以硬加载为准，避免双接口扇出
+    const tasks = await http.get('/my/tasks')
     if (!ticket.isCurrent()) return
     list.value = tasks as any[]
-    const t = today as any
-    isRestDay.value = !!t?.isRestDay
-    makeupEnabled.value = t?.makeupEnabled !== false
-    slotExtendedEnabled.value = !!t?.slotExtendedEnabled
-    localStorage.setItem(
-      'slotExtendedEnabled',
-      slotExtendedEnabled.value ? '1' : '0',
-    )
-    if (t?.slotClockEffective) {
-      slotClockEffective.value = t.slotClockEffective
+    if (!soft) {
+      const t: any = await http.get('/my/today')
+      if (!ticket.isCurrent()) return
+      isRestDay.value = !!t?.isRestDay
+      makeupEnabled.value = t?.makeupEnabled !== false
+      slotExtendedEnabled.value = !!t?.slotExtendedEnabled
       localStorage.setItem(
-        'slotClockEffective',
-        JSON.stringify(t.slotClockEffective),
+        'slotExtendedEnabled',
+        slotExtendedEnabled.value ? '1' : '0',
       )
+      if (t?.slotClockEffective) {
+        slotClockEffective.value = t.slotClockEffective
+        localStorage.setItem(
+          'slotClockEffective',
+          JSON.stringify(t.slotClockEffective),
+        )
+      }
     }
   } catch (e: any) {
     if (!ticket.isCurrent()) return

@@ -11,19 +11,21 @@ import {
 } from '@nestjs/common';
 import { AllowanceService } from './allowance.service';
 import {
+  CreateAchievementClaimDto,
   CreateAllowanceEntryDto,
   CreateAllowanceGoalDto,
   ReviewAllowanceEntryDto,
   SaveToGoalDto,
   UpdateAllowanceGoalDto,
 } from './dto';
-import { JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxyGuard, JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxy } from '../common/forbid-proxy.decorator';
 import { Roles } from '../common/roles.decorator';
 import { UserRole } from '../common/enums';
 import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller('allowance')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ForbidProxyGuard)
 export class AllowanceController {
   constructor(private readonly allowance: AllowanceService) {}
 
@@ -57,6 +59,7 @@ export class AllowanceController {
 
   @Post('entries')
   @Roles(UserRole.PARENT, UserRole.STUDENT)
+  @ForbidProxy()
   createEntry(
     @CurrentUser() user: { id: number; role: string; name?: string },
     @Body() dto: CreateAllowanceEntryDto,
@@ -74,6 +77,46 @@ export class AllowanceController {
     return this.allowance.reviewEntry(user.id, id, dto, user.name);
   }
 
+  @Get('achievements')
+  @Roles(UserRole.PARENT, UserRole.STUDENT)
+  listAchievements(
+    @CurrentUser() user: { id: number; role: string },
+    @Query('studentId') studentId?: string,
+  ) {
+    const sid = studentId ? Number(studentId) : undefined;
+    return this.allowance.listAchievements(
+      user,
+      Number.isFinite(sid) ? sid : undefined,
+    );
+  }
+
+  @Post('achievements')
+  @Roles(UserRole.PARENT)
+  createAchievement(
+    @CurrentUser() user: { id: number },
+    @Body() dto: CreateAchievementClaimDto,
+  ) {
+    return this.allowance.createAchievement(user.id, dto);
+  }
+
+  @Post('achievements/:id/post')
+  @Roles(UserRole.PARENT)
+  postAchievement(
+    @CurrentUser() user: { id: number },
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.allowance.postAchievement(user.id, id);
+  }
+
+  @Post('achievements/:id/cancel')
+  @Roles(UserRole.PARENT)
+  cancelAchievement(
+    @CurrentUser() user: { id: number },
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.allowance.cancelAchievement(user.id, id);
+  }
+
   @Get('goals')
   @Roles(UserRole.STUDENT)
   goals(@CurrentUser() user: { id: number }) {
@@ -82,6 +125,7 @@ export class AllowanceController {
 
   @Post('goals')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   createGoal(
     @CurrentUser() user: { id: number },
     @Body() dto: CreateAllowanceGoalDto,
@@ -91,6 +135,7 @@ export class AllowanceController {
 
   @Patch('goals/:id')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   updateGoal(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,
@@ -101,6 +146,7 @@ export class AllowanceController {
 
   @Post('goals/:id/save')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   saveToGoal(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,

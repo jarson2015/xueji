@@ -18,6 +18,7 @@ import { FamilySettings } from './entities/family-settings.entity';
 import { AllowanceAccount } from './entities/allowance-account.entity';
 import { AllowanceEntry } from './entities/allowance-entry.entity';
 import { AllowanceGoal } from './entities/allowance-goal.entity';
+import { assignUniqueLoginCode } from './common/login-code';
 import {
   AssignStatus,
   ConfirmStatus,
@@ -129,8 +130,8 @@ async function run() {
       pointsBalance: 0,
     }),
   );
-  const codeExpiry = new Date();
-  codeExpiry.setDate(codeExpiry.getDate() + 30);
+  const code1 = await assignUniqueLoginCode(users, '10293847');
+  const code2 = await assignUniqueLoginCode(users, '20384756');
   const s1 = await users.save(
     users.create({
       username: 'student1',
@@ -138,8 +139,11 @@ async function run() {
       name: '小明',
       role: UserRole.STUDENT,
       pointsBalance: 40,
-      loginCode: '102938',
-      loginCodeExpiresAt: codeExpiry,
+      loginCode: null,
+      loginCodeHash: code1.loginCodeHash,
+      loginCodeHint: code1.loginCodeHint,
+      loginCodeExpiresAt: code1.loginCodeExpiresAt,
+      proxyEpoch: 0,
     }),
   );
   const s2 = await users.save(
@@ -149,8 +153,11 @@ async function run() {
       name: '小红',
       role: UserRole.STUDENT,
       pointsBalance: 10,
-      loginCode: '203847',
-      loginCodeExpiresAt: codeExpiry,
+      loginCode: null,
+      loginCodeHash: code2.loginCodeHash,
+      loginCodeHint: code2.loginCodeHint,
+      loginCodeExpiresAt: code2.loginCodeExpiresAt,
+      proxyEpoch: 0,
     }),
   );
   await links.save([

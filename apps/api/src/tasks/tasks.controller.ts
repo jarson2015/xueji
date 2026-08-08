@@ -12,13 +12,14 @@ import {
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { AssignTaskDto, CreateTaskDto, UpdateTaskDto, ProposeTaskDto, ApproveTaskProposalDto, RejectTaskProposalDto } from './dto';
-import { JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxyGuard, JwtAuthGuard, RolesGuard } from '../common/guards';
+import { ForbidProxy } from '../common/forbid-proxy.decorator';
 import { Roles } from '../common/roles.decorator';
 import { UserRole } from '../common/enums';
 import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ForbidProxyGuard)
 export class TasksController {
   constructor(private readonly tasks: TasksService) {}
 
@@ -62,6 +63,7 @@ export class TasksController {
 
   @Post('tasks/propose')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   propose(@CurrentUser() user: { id: number }, @Body() dto: ProposeTaskDto) {
     return this.tasks.propose(user.id, dto);
   }
@@ -76,6 +78,15 @@ export class TasksController {
   @Roles(UserRole.PARENT)
   create(@CurrentUser() user: { id: number }, @Body() dto: CreateTaskDto) {
     return this.tasks.create(user.id, dto);
+  }
+
+  @Get('tasks/:id')
+  @Roles(UserRole.PARENT)
+  getOne(
+    @CurrentUser() user: { id: number },
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.tasks.getForParent(user.id, id);
   }
 
   @Patch('tasks/:id')
@@ -113,6 +124,15 @@ export class TasksController {
     return this.tasks.myTasks(user.id);
   }
 
+  @Get('my/assigns/:id/steps')
+  @Roles(UserRole.STUDENT)
+  assignSteps(
+    @CurrentUser() user: { id: number },
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.tasks.stepsForStudentAssign(user.id, id);
+  }
+
   @Get('my/archived-tasks')
   @Roles(UserRole.STUDENT)
   myArchived(@CurrentUser() user: { id: number }) {
@@ -134,6 +154,7 @@ export class TasksController {
 
   @Post('my/assigns/:id/defer-today')
   @Roles(UserRole.STUDENT)
+  @ForbidProxy()
   deferToday(
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,

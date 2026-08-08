@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function loginStudent(page: Page) {
   await page.goto('/login')
@@ -29,7 +29,7 @@ test.describe('学迹家庭手账 P0.5', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             code: 0,
-            data: [{ id: 1, authorId: 2, authorName: '小明', body: '更早一条', visibility: 'family', commentCount: 0, createdAt: new Date().toISOString() }],
+            data: [{ id: 1, authorId: 2, authorName: '小明', body: '更早一�?, visibility: 'family', commentCount: 0, createdAt: new Date().toISOString() }],
           }),
         })
         return
@@ -100,11 +100,11 @@ test.describe('学迹家庭手账 P0.5', () => {
     await expect(page.locator('h2.page-title')).toHaveText('家庭说说', { timeout: 15_000 })
     await expect(page.getByText('手账 100')).toBeVisible()
     await page.getByRole('button', { name: '加载更多' }).click()
-    await expect(page.getByText('更早一条')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('更早一�?)).toBeVisible({ timeout: 10_000 })
 
     await page.getByText('我的私密日记').click()
     await page.getByRole('button', { name: '删除' }).first().click()
-    await expect(page.getByRole('heading', { name: '删除私密日记？' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '删除私密日记�? })).toBeVisible()
     await expect(page.locator('.sp-msg')).toContainText('安静')
     await page.getByRole('button', { name: '保留' }).click()
   })

@@ -57,10 +57,136 @@
             class="post-img"
           />
         </div>
+
+        <!-- UJ：BBS 式楼层（列表内嵌） -->
+        <div class="thread" :aria-label="`回应 ${p.commentCount || 0} 条`">
+          <div
+            v-for="(c, idx) in visibleRoots(p)"
+            :key="c.id"
+            class="floor"
+          >
+            <div class="floor-head">
+              <span class="floor-no">#{{ idx + 1 }}</span>
+              <strong>{{ c.authorName }}</strong>
+              <span class="muted tiny">{{ formatTime(c.createdAt) }}</span>
+              <div class="floor-actions">
+                <el-button text type="primary" class="tap-btn" @click="startInlineReply(p, c)">
+                  接话
+                </el-button>
+                <el-button
+                  v-if="canDeleteComment(c)"
+                  text
+                  type="danger"
+                  class="tap-btn"
+                  @click="askDeleteComment(c, p)"
+                >
+                  删除
+                </el-button>
+              </div>
+            </div>
+            <p class="floor-body">{{ c.body }}</p>
+            <div
+              v-for="r in c.replies || []"
+              :key="r.id"
+              class="floor-reply"
+            >
+              <div class="floor-head">
+                <strong>{{ r.authorName }}</strong>
+                <span class="muted tiny">{{ formatTime(r.createdAt) }}</span>
+                <div class="floor-actions">
+                  <el-button
+                    v-if="canDeleteComment(r)"
+                    text
+                    type="danger"
+                    class="tap-btn"
+                    @click="askDeleteComment(r, p)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+              </div>
+              <p class="floor-body">{{ r.body }}</p>
+            </div>
+          </div>
+
+          <button
+            v-if="canExpandThread(p)"
+            type="button"
+            class="thread-more"
+            :disabled="threadLoadingId === p.id"
+            @click="expandThread(p)"
+          >
+            {{
+              threadLoadingId === p.id
+                ? '加载中…'
+                : `展开全部回应（${p.commentCount}）`
+            }}
+          </button>
+          <button
+            v-else-if="isThreadExpanded(p)"
+            type="button"
+            class="thread-more"
+            @click="collapseThread(p)"
+          >
+            收起回应
+          </button>
+
+          <div
+            v-if="!visibleRoots(p).length && !(p.commentCount > 0)"
+            class="thread-empty muted tiny"
+          >
+            还没有回应，做第一个接话的人吧。
+          </div>
+
+          <div class="inline-compose">
+            <p v-if="inlineReply.postId === p.id && inlineReply.parentId" class="reply-hint muted tiny">
+              回复 {{ inlineReply.parentName }}
+              <el-button text type="primary" class="tap-btn" @click="clearInlineReply">
+                取消
+              </el-button>
+            </p>
+            <div class="prompt-row inline-prompts">
+              <button
+                v-for="t in commentPrompts"
+                :key="t"
+                type="button"
+                class="prompt-chip"
+                @click="applyInlinePrompt(p, t)"
+              >
+                {{ t }}
+              </button>
+            </div>
+            <el-input
+              :model-value="inlineBodyFor(p.id)"
+              type="textarea"
+              :rows="2"
+              maxlength="200"
+              show-word-limit
+              :placeholder="
+                inlineReply.postId === p.id && inlineReply.parentId
+                  ? `回复 ${inlineReply.parentName}…`
+                  : '写一句回应…'
+              "
+              @update:model-value="setInlineBody(p.id, $event)"
+            />
+            <div class="inline-compose-actions">
+              <el-button
+                type="primary"
+                class="tap-btn"
+                :loading="inlineBusyId === p.id"
+                :disabled="!inlineBodyFor(p.id).trim()"
+                @click="submitInlineComment(p)"
+              >
+                发送回应
+              </el-button>
+              <el-button text type="primary" class="tap-btn" @click="openDetail(p)">
+                专注写回应
+              </el-button>
+            </div>
+          </div>
+        </div>
+
         <div class="post-actions">
-          <el-button text type="primary" class="tap-btn" @click="openDetail(p)">
-            回应 {{ p.commentCount ? `(${p.commentCount})` : '' }}
-          </el-button>
           <el-button
             v-if="p.canEdit"
             text
@@ -179,15 +305,15 @@
           </template>
         </el-collapse-item>
       </el-collapse>
-      <p v-else-if="isStudent && isProxy" class="muted proxy-hint">
-        {{ privateShort }}仅本人可见，代登时不可使用。
+      <p v-else-if="isStudent && isProxy" class="muted proxy-hint proxy-hint-strong">
+        {{ privateShort }}仅本人可见，代登时不可使用。代登家长无法打开或代写私密内容。
       </p>
     </template>
 
     <!-- 发帖 -->
     <el-drawer v-model="composerOpen" :title="composeTitle" size="auto" direction="btt">
       <div class="drawer-body">
-        <p v-if="isProxy" class="muted tiny">{{ proxyHint }}</p>
+        <p v-if="isProxy" class="muted tiny proxy-compose-banner">{{ proxyHint }}</p>
         <div class="prompt-row">
           <button
             v-for="t in postPrompts"
@@ -379,9 +505,12 @@
       </div>
     </el-drawer>
 
-    <!-- 回应 -->
-    <el-drawer v-model="detailOpen" title="回应" size="auto" direction="btt">
+    <!-- 可选：专注回应（列表已可内嵌接话） -->
+    <el-drawer v-model="detailOpen" title="专注回应" size="auto" direction="btt">
       <div v-if="activePost" class="drawer-body">
+        <p class="muted tiny" style="margin: 0 0 8px">
+          也可在时间线帖子下方直接接话。
+        </p>
         <p v-if="activePost.body" class="post-body">{{ activePost.body }}</p>
         <div v-if="activePost.imageUrls?.length" class="post-images">
           <img
@@ -570,7 +699,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../../api/http'
@@ -600,6 +729,9 @@ import {
   buildShareLayer1Copy,
   journalCommentPromptsForRole,
 } from '../../composables/journalSoftCopy'
+import type { EmotionFunctionKind } from '../../composables/emotionFunctionHint'
+
+defineOptions({ name: 'FamilyJournalView' })
 
 const PAGE_SIZE = 30
 
@@ -607,13 +739,13 @@ const route = useRoute()
 const auth = useAuthStore()
 const isStudent = computed(() => route.path.startsWith('/student'))
 const isProxy = computed(() => auth.isParentProxy())
-const proxyHint = buildProxyComposeHint()
 
 /** 学生读 localStorage；家长固定 general → 家庭说说 */
 const ageBand = computed(() => {
   if (!isStudent.value) return 'general'
   return localStorage.getItem('ageBand') || 'general'
 })
+const proxyHint = computed(() => buildProxyComposeHint(ageBand.value))
 const productName = computed(() => journalProductName(ageBand.value))
 const privateName = computed(() => journalPrivateName(ageBand.value))
 const privateShort = computed(() =>
@@ -685,6 +817,124 @@ const replyPlaceholder = computed(() =>
   replyToId.value ? `回复 ${replyToName.value}…` : '写一句回应…',
 )
 
+/** UJ：列表预览主评条数（与 API preview 一致） */
+const PREVIEW_ROOT = 5
+const expandedIds = ref(new Set<number>())
+const fullThreads = reactive<Record<number, any[]>>({})
+const threadLoadingId = ref<number | null>(null)
+const inlineBodies = reactive<Record<number, string>>({})
+const inlineBusyId = ref<number | null>(null)
+const inlineReply = reactive({
+  postId: null as number | null,
+  parentId: null as number | null,
+  parentName: '',
+})
+
+function previewTotalCount(p: any) {
+  const roots = Array.isArray(p.previewComments) ? p.previewComments : []
+  return roots.reduce(
+    (n: number, c: any) => n + 1 + (Array.isArray(c.replies) ? c.replies.length : 0),
+    0,
+  )
+}
+
+function visibleRoots(p: any) {
+  if (expandedIds.value.has(p.id) && fullThreads[p.id]) {
+    return fullThreads[p.id]
+  }
+  return Array.isArray(p.previewComments) ? p.previewComments : []
+}
+
+function canExpandThread(p: any) {
+  if (expandedIds.value.has(p.id)) return false
+  return (p.commentCount || 0) > previewTotalCount(p)
+}
+
+function isThreadExpanded(p: any) {
+  return expandedIds.value.has(p.id)
+}
+
+async function expandThread(p: any) {
+  threadLoadingId.value = p.id
+  try {
+    const data = (await http.get(`/journal/posts/${p.id}/comments`)) as any[]
+    fullThreads[p.id] = Array.isArray(data) ? data : []
+    const next = new Set(expandedIds.value)
+    next.add(p.id)
+    expandedIds.value = next
+  } catch (err: any) {
+    ElMessage.error(friendlyError(err, '加载回应失败'))
+  } finally {
+    threadLoadingId.value = null
+  }
+}
+
+function collapseThread(p: any) {
+  const next = new Set(expandedIds.value)
+  next.delete(p.id)
+  expandedIds.value = next
+}
+
+function inlineBodyFor(postId: number) {
+  return inlineBodies[postId] || ''
+}
+
+function setInlineBody(postId: number, v: string | number) {
+  inlineBodies[postId] = String(v ?? '')
+}
+
+function startInlineReply(p: any, c: any) {
+  inlineReply.postId = p.id
+  inlineReply.parentId = c.id
+  inlineReply.parentName = c.authorName || ''
+}
+
+function clearInlineReply() {
+  inlineReply.postId = null
+  inlineReply.parentId = null
+  inlineReply.parentName = ''
+}
+
+function applyInlinePrompt(p: any, t: string) {
+  inlineBodies[p.id] = applyTextPrompt(inlineBodies[p.id] || '', t)
+}
+
+async function refreshExpandedThread(postId: number) {
+  if (!expandedIds.value.has(postId)) return
+  try {
+    const data = (await http.get(`/journal/posts/${postId}/comments`)) as any[]
+    fullThreads[postId] = Array.isArray(data) ? data : []
+  } catch {
+    /* 列表已刷新即可 */
+  }
+}
+
+async function submitInlineComment(p: any) {
+  const body = inlineBodyFor(p.id).trim()
+  if (!body) return
+  inlineBusyId.value = p.id
+  try {
+    const payload: { body: string; parentCommentId?: number } = { body }
+    if (inlineReply.postId === p.id && inlineReply.parentId) {
+      payload.parentCommentId = inlineReply.parentId
+    }
+    await http.post(`/journal/posts/${p.id}/comments`, payload)
+    inlineBodies[p.id] = ''
+    clearInlineReply()
+    ElMessage.success('已发送')
+    await loadPosts()
+    await refreshExpandedThread(p.id)
+    if (detailOpen.value && activePost.value?.id === p.id) {
+      const data = (await http.get(`/journal/posts/${p.id}/comments`)) as any[]
+      comments.value = Array.isArray(data) ? data : []
+    }
+  } catch (err: any) {
+    ElMessage.error(friendlyError(err, '发送失败'))
+  } finally {
+    inlineBusyId.value = null
+  }
+}
+
 const diaryForm = reactive({ body: '', moodTag: '' as string })
 const diaryBusy = ref(false)
 
@@ -715,7 +965,11 @@ const deleteDiaryCopy = computed(() =>
   buildDeleteDiaryCopy(deleteDiaryPrompt.preview, ageBand.value),
 )
 
-const deleteCommentPrompt = reactive({ open: false, id: 0 as number })
+const deleteCommentPrompt = reactive({
+  open: false,
+  id: 0 as number,
+  postId: 0 as number,
+})
 const deleteCommentCopy = buildDeleteCommentCopy()
 
 const shareL1 = reactive({ open: false, diary: null as any })
@@ -733,9 +987,23 @@ const pendingShareDiary = ref<any>(null)
 
 const moodOptions = MOOD_OPTIONS
 const postPrompts = JOURNAL_POST_PROMPTS
-const commentPrompts = computed(() =>
-  journalCommentPromptsForRole(auth.user?.role),
-)
+const commentPrompts = computed(() => {
+  let kind: EmotionFunctionKind | null = null
+  try {
+    const raw = localStorage.getItem('xueji_emotion_fn_kind')
+    if (
+      raw === 'exhaustion' ||
+      raw === 'competence_threat' ||
+      raw === 'relation_threat' ||
+      raw === 'meaning_gap'
+    ) {
+      kind = raw
+    }
+  } catch {
+    /* ignore */
+  }
+  return journalCommentPromptsForRole(auth.user?.role, kind)
+})
 
 function moodLabel(tag?: string | null) {
   if (!tag) return ''
@@ -900,6 +1168,10 @@ async function loadPosts() {
   const data = await fetchPosts()
   posts.value = data
   hasMore.value = data.length >= PAGE_SIZE
+  const expanded = [...expandedIds.value]
+  if (expanded.length) {
+    await Promise.all(expanded.map((id) => refreshExpandedThread(id)))
+  }
 }
 
 async function loadMore() {
@@ -1068,6 +1340,9 @@ async function submitComment() {
     )) as any[]
     comments.value = Array.isArray(data) ? data : []
     await loadPosts()
+    if (activePost.value?.id) {
+      await refreshExpandedThread(activePost.value.id)
+    }
   } catch (err: any) {
     ElMessage.error(friendlyError(err, '发送失败'))
   } finally {
@@ -1096,8 +1371,9 @@ async function confirmDeletePost() {
   }
 }
 
-function askDeleteComment(c: any) {
+function askDeleteComment(c: any, p?: any) {
   deleteCommentPrompt.id = c.id
+  deleteCommentPrompt.postId = p?.id || activePost.value?.id || 0
   deleteCommentPrompt.open = true
 }
 
@@ -1105,13 +1381,15 @@ async function confirmDeleteComment() {
   try {
     await http.patch(`/journal/comments/${deleteCommentPrompt.id}/delete`)
     ElMessage.success('已删除')
-    if (activePost.value) {
+    const postId = deleteCommentPrompt.postId
+    if (activePost.value && activePost.value.id === postId) {
       const data = (await http.get(
         `/journal/posts/${activePost.value.id}/comments`,
       )) as any[]
       comments.value = Array.isArray(data) ? data : []
     }
     await loadPosts()
+    if (postId) await refreshExpandedThread(postId)
   } catch (err: any) {
     ElMessage.error(friendlyError(err, '删除失败'))
   }
@@ -1241,6 +1519,11 @@ async function confirmShare(force: boolean) {
 }
 
 onMounted(load)
+
+/** keep-alive 再进入：软刷新列表 */
+onActivated(() => {
+  void load()
+})
 </script>
 
 <style scoped>
@@ -1310,6 +1593,94 @@ onMounted(load)
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+.thread {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+.floor {
+  margin: 0 0 10px;
+  padding: 8px 0 8px 12px;
+  border-left: 3px solid var(--accent-soft, #d8ebe0);
+  border-radius: 0 6px 6px 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-soft, #d8ebe0) 55%, transparent),
+    transparent 72%
+  );
+}
+.floor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.floor-no {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent, #2f6f4e);
+  font-variant-numeric: tabular-nums;
+}
+.floor-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+.floor-body {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+  font-size: 14px;
+}
+.floor-reply {
+  margin: 8px 0 0 10px;
+  padding: 6px 0 6px 10px;
+  border-left: 2px dashed color-mix(in srgb, var(--accent, #2f6f4e) 35%, transparent);
+}
+.thread-more {
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-soft, #d8ebe0);
+  color: var(--accent-strong, #1f4d36);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+}
+.thread-more:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.thread-more:not(:disabled):active {
+  filter: brightness(0.97);
+}
+.thread-empty {
+  margin: 0 0 8px;
+}
+.inline-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.inline-prompts {
+  max-height: 72px;
+  overflow: auto;
+}
+.inline-compose-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
 }
 .more-wrap {
   display: flex;
@@ -1414,6 +1785,13 @@ onMounted(load)
 }
 .proxy-hint {
   margin-top: 16px;
+}
+.proxy-hint-strong,
+.proxy-compose-banner {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-soft, #f5f5f5);
+  line-height: 1.45;
 }
 .tiny {
   font-size: 12px;

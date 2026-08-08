@@ -77,4 +77,11 @@ export class AllowanceEntry {
 
   @Column({ name: 'posted_at', type: 'datetime', nullable: true })
   postedAt: Date | null;
+
+  /** V1.5：如 achievement_claim */
+  @Column({ name: 'ref_type', type: 'varchar', length: 32, nullable: true })
+  refType: string | null;
+
+  @Column({ name: 'ref_id', type: 'int', nullable: true })
+  refId: number | null;
 }

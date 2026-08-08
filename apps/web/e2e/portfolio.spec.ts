@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 
 const PARENT_USER = process.env.E2E_PARENT_USER || 'parent@demo.com'
 const PARENT_PASS = process.env.E2E_PARENT_PASS || 'demo1234'
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page) {
   await page.goto('/login')
@@ -18,7 +18,7 @@ async function clearSession(page: Page) {
 }
 
 test.describe('学迹作品集主题周过滤', () => {
-  test('家长作品集 Tab：统计行可见；有主题史时可按周筛选', async ({ page }) => {
+  test('家长作品�?Tab：统计行可见；有主题史时可按周筛�?, async ({ page }) => {
     await clearSession(page)
     await page.getByRole('button', { name: '家长' }).click()
     await page.getByRole('textbox', { name: '账号' }).fill(PARENT_USER)
@@ -27,13 +27,13 @@ test.describe('学迹作品集主题周过滤', () => {
     await expect(page).toHaveURL(/\/parent(\/monitor)?/)
 
     await page.goto('/parent/growth?tab=portfolio')
-    await expect(page.getByRole('tab', { name: '作品集' })).toBeVisible({
+    await expect(page.getByRole('tab', { name: '作品�? })).toBeVisible({
       timeout: 15_000,
     })
     await expect(page.locator('.portfolio-stats')).toBeVisible()
     await expect(page.getByText(/照片\s*\d+/)).toBeVisible()
 
-    const filterTitle = page.getByRole('heading', { name: '按主题周看' })
+    const filterTitle = page.getByRole('heading', { name: '按主题周�? })
     if (await filterTitle.isVisible().catch(() => false)) {
       await expect(page.getByRole('button', { name: '全部' })).toBeVisible()
       const weekChip = page.locator('.theme-filter .theme-chip').nth(1)
@@ -58,7 +58,7 @@ test.describe('学迹作品集主题周过滤', () => {
     if (await skip.isVisible().catch(() => false)) await skip.click()
 
     await page.goto('/student/growth?tab=portfolio')
-    await expect(page.getByRole('tab', { name: '作品集' })).toBeVisible({
+    await expect(page.getByRole('tab', { name: '作品�? })).toBeVisible({
       timeout: 15_000,
     })
     await expect(page.locator('.portfolio-stats')).toBeVisible()

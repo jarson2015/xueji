@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 
 const PARENT_USER = process.env.E2E_PARENT_USER || 'parent@demo.com'
 const PARENT_PASS = process.env.E2E_PARENT_PASS || 'demo1234'
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page, role: 'parent' | 'student') {
   await page.goto('/login')
@@ -39,7 +39,7 @@ async function loginStudent(page: Page) {
 }
 
 test.describe('学迹家庭说说入口', () => {
-  test('家长 More → 家庭说说', async ({ page }) => {
+  test('家长 More �?家庭说说', async ({ page }) => {
     await loginParent(page)
     await page.goto('/parent/more')
     await expect(
@@ -52,11 +52,11 @@ test.describe('学迹家庭说说入口', () => {
     await expect(page.locator('h2.page-title')).toHaveText('家庭说说', {
       timeout: 15_000,
     })
-    await expect(page.getByText(/不计分/)).toBeVisible()
+    await expect(page.getByText(/不计�?)).toBeVisible()
     await expect(page.getByText('我的私密日记')).toHaveCount(0)
   })
 
-  test('学生 More → 家庭说说含私密区入口', async ({ page }) => {
+  test('学生 More �?家庭说说含私密区入口', async ({ page }) => {
     await loginStudent(page)
     await page.goto('/student/more')
     await expect(

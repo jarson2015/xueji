@@ -5,7 +5,7 @@
       <el-button type="primary" class="tap-btn" @click="openCreate">添加学生</el-button>
     </div>
 
-    <p class="lead muted">把登录码给孩子，就能用 6 位数字进入「今日」。</p>
+    <p class="lead muted">把登录码给孩子，就能用 8 位数字进入「今日」。完整码仅在生成/刷新时显示一次。</p>
 
     <!-- P2：孩子优先 —— 日常管码 / 帮进今日 -->
     <div v-if="!loading && !list.length" class="card-panel empty-hero">
@@ -27,7 +27,7 @@
         >
           <strong>{{ s.name }}</strong>
           <span class="muted tiny">
-            {{ s.loginCode || '无码' }}
+            {{ codeLabel(s) }}
             <template v-if="s.ageBand"> · {{ ageBandLabel(s.ageBand) }}</template>
           </span>
         </button>
@@ -45,22 +45,28 @@
         </div>
         <div class="code-hero">
           <span class="muted code-label">登录码</span>
-          <div class="code">{{ selectedStudent.loginCode || '—' }}</div>
+          <div class="code">{{ displayCode(selectedStudent) || '—' }}</div>
           <div class="muted expiry" v-if="selectedStudent.loginCodeExpiresAt">
             {{ expiryText(selectedStudent.loginCodeExpiresAt) }}
           </div>
+          <p v-if="!displayCode(selectedStudent) && selectedStudent.hasLoginCode" class="muted tiny">
+            完整码仅在刷新后显示；点「刷新登录码」可查看新码
+          </p>
           <el-button
             type="primary"
             class="tap-btn full-tap"
-            :disabled="!selectedStudent.loginCode"
+            :disabled="!displayCode(selectedStudent)"
             @click="copyCode(selectedStudent)"
           >
             复制登录码
           </el-button>
-          <LoginCodeQr v-if="selectedStudent.loginCode" :code="selectedStudent.loginCode" />
+          <LoginCodeQr
+            v-if="displayCode(selectedStudent)"
+            :code="displayCode(selectedStudent)!"
+          />
           <el-button
             class="tap-btn full-tap enter-as-btn"
-            :disabled="!selectedStudent.loginCode"
+            :disabled="!canEnterAs(selectedStudent)"
             :loading="enteringId === selectedStudent.id"
             @click="enterAs(selectedStudent)"
           >
@@ -101,22 +107,25 @@
 
         <div class="code-hero">
           <span class="muted code-label">登录码</span>
-          <div class="code">{{ s.loginCode || '—' }}</div>
+          <div class="code">{{ displayCode(s) || '—' }}</div>
           <div class="muted expiry" v-if="s.loginCodeExpiresAt">
             {{ expiryText(s.loginCodeExpiresAt) }}
           </div>
+          <p v-if="!displayCode(s) && s.hasLoginCode" class="muted tiny">
+            完整码仅在刷新后显示；点「刷新登录码」可查看新码
+          </p>
           <el-button
             type="primary"
             class="tap-btn full-tap"
-            :disabled="!s.loginCode"
+            :disabled="!displayCode(s)"
             @click="copyCode(s)"
           >
             复制登录码
           </el-button>
-          <LoginCodeQr v-if="s.loginCode" :code="s.loginCode" />
+          <LoginCodeQr v-if="displayCode(s)" :code="displayCode(s)!" />
           <el-button
             class="tap-btn full-tap enter-as-btn"
-            :disabled="!s.loginCode"
+            :disabled="!canEnterAs(s)"
             :loading="enteringId === s.id"
             @click="enterAs(s)"
           >
@@ -323,6 +332,44 @@ const AGE_CODE_TO_LABEL: Record<string, string> = {
   general: '通用',
   teen: '少年',
 }
+const REVEALED_KEY = 'xueji.revealedLoginCodes'
+/** 明文登录码仅短时留在本页 session（SEC P2b） */
+const REVEAL_TTL_MS = 10 * 60 * 1000
+
+type RevealedEntry = { code: string; at: number }
+
+function readRevealedCodes(): Record<number, RevealedEntry> {
+  try {
+    const raw = sessionStorage.getItem(REVEALED_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const out: Record<number, RevealedEntry> = {}
+    const now = Date.now()
+    for (const [k, v] of Object.entries(parsed || {})) {
+      const id = Number(k)
+      if (!Number.isFinite(id)) continue
+      // 兼容旧格式：纯字符串码
+      if (typeof v === 'string' && /^\d{6,8}$/.test(v)) {
+        out[id] = { code: v, at: now }
+        continue
+      }
+      const ent = v as RevealedEntry
+      if (
+        ent &&
+        /^\d{6,8}$/.test(String(ent.code || '')) &&
+        typeof ent.at === 'number' &&
+        now - ent.at < REVEAL_TTL_MS
+      ) {
+        out[id] = { code: String(ent.code), at: ent.at }
+      }
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+const revealedCodes = reactive<Record<number, RevealedEntry>>(readRevealedCodes())
 const list = ref<any[]>([])
 const enteringId = ref(0)
 const loading = ref(true)
@@ -341,6 +388,44 @@ const form = reactive({
   birthOrder: undefined as number | undefined,
   ageBand: '' as string,
 })
+
+function persistRevealed() {
+  sessionStorage.setItem(REVEALED_KEY, JSON.stringify(revealedCodes))
+}
+
+function rememberCode(id: number, code: string | null | undefined) {
+  if (!id || !code || !/^\d{6,8}$/.test(code)) return
+  revealedCodes[id] = { code, at: Date.now() }
+  persistRevealed()
+}
+
+function displayCode(row: any): string | null {
+  if (!row) return null
+  const ent = revealedCodes[row.id]
+  if (ent) {
+    if (Date.now() - ent.at >= REVEAL_TTL_MS) {
+      delete revealedCodes[row.id]
+      persistRevealed()
+    } else {
+      return ent.code
+    }
+  }
+  return row.loginCode || null
+}
+
+function codeLabel(row: any): string {
+  const full = displayCode(row)
+  if (full) return full
+  if (row?.loginCodeHint) return `••••${row.loginCodeHint}`
+  if (row?.hasLoginCode) return '已设置'
+  return '无码'
+}
+
+function canEnterAs(row: any): boolean {
+  if (!row?.hasLoginCode && !displayCode(row)) return false
+  if (!row.loginCodeExpiresAt) return false
+  return new Date(row.loginCodeExpiresAt).getTime() >= Date.now()
+}
 
 function ageBandLabel(b: string) {
   return (
@@ -463,14 +548,19 @@ async function create() {
   }
   saving.value = true
   try {
-    await http.post('/students', {
+    const created: any = await http.post('/students', {
       name: form.name,
       username: form.username,
       password: form.password,
       birthOrder: form.birthOrder || undefined,
       ageBand: form.ageBand || undefined,
     })
-    ElMessage.success('已添加，请把登录码告诉孩子')
+    rememberCode(created?.id, created?.loginCode)
+    ElMessage.success(
+      created?.loginCode
+        ? `已添加，登录码：${created.loginCode}`
+        : '已添加，请把登录码告诉孩子',
+    )
     dlg.value = false
     await load()
   } catch (e: any) {
@@ -481,12 +571,13 @@ async function create() {
 }
 
 async function copyCode(row: any) {
-  if (!row.loginCode) return ElMessage.warning('暂无登录码')
+  const code = displayCode(row)
+  if (!code) return ElMessage.warning('暂无完整登录码，请先刷新')
   try {
-    await navigator.clipboard.writeText(row.loginCode)
+    await navigator.clipboard.writeText(code)
     ElMessage.success(`已复制 ${row.name} 的登录码`)
   } catch {
-    ElMessage.info(`登录码：${row.loginCode}`)
+    ElMessage.info(`登录码：${code}`)
   }
 }
 
@@ -617,7 +708,10 @@ async function onSoftConfirm(note: string) {
     }
     if (mode === 'refresh') {
       const updated: any = await http.post(`/students/${id}/login-code`)
-      ElMessage.success(`新登录码：${updated.loginCode}`)
+      rememberCode(id, updated?.loginCode)
+      ElMessage.success(
+        updated?.loginCode ? `新登录码：${updated.loginCode}` : '已刷新登录码',
+      )
       await load()
       return
     }

@@ -5,9 +5,10 @@
     <h2 class="page-title">{{ labels.studentRewards }}</h2>
     <p class="lead muted">
       {{
-        starMode
+        agePack.nonBuyWishHint ||
+        (starMode
           ? '愿望更适合一起经历的事。星星是鼓励，不是目的。'
-          : '愿望更适合一起经历的事：陪伴、体验、选择权。积分是工具，不是目的。'
+          : '愿望更适合一起经历的事：陪伴、体验、选择权。积分是工具，不是目的。')
       }}
     </p>
 
@@ -60,7 +61,10 @@
       </div>
     </div>
 
-    <div class="card-panel balance soft-balance">
+    <div
+      class="card-panel balance soft-balance"
+      :class="{ 'balance-deemph': agePack.balanceDeemphasized }"
+    >
       <div class="balance-row">
         <span class="muted">{{ starMode ? '我的星星' : '可用积分' }}</span>
         <strong class="balance-num">{{ points.balance }}</strong>
@@ -315,6 +319,7 @@ import PageSkeleton from '../../components/PageSkeleton.vue'
 import SoftPrompt from '../../components/SoftPrompt.vue'
 import SoftStay from '../../components/SoftStay.vue'
 import { usesStarNarrative } from '../../composables/pointsNarrative'
+import { getAgeContentPack } from '../../composables/ageContentPack'
 import { createLoadGate, tryBegin } from '../../composables/asyncGuard'
 import {
   buildAckStayMessage,
@@ -366,6 +371,7 @@ const pactsEnabled = ref(false)
 const pactOwed = ref(0)
 const ageBand = ref(localStorage.getItem('ageBand') || 'general')
 const starMode = computed(() => usesStarNarrative(ageBand.value))
+const agePack = computed(() => getAgeContentPack(ageBand.value))
 const myId = computed(() => auth.user?.id || 0)
 const points = reactive<any>({
   balance: 0,
@@ -657,6 +663,15 @@ onActivated(() => {
   font-weight: 700;
   color: var(--accent);
   font-family: var(--font-display);
+}
+.balance-deemph .balance-num {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--muted, #888);
+}
+.balance-deemph {
+  order: 2;
+  opacity: 0.92;
 }
 .balance-tip {
   margin: 6px 0 0;

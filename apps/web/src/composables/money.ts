@@ -24,7 +24,7 @@ export const ALLOWANCE_CATEGORY_LABELS: Record<string, string> = {
 
 export const ALLOWANCE_KIND_LABELS: Record<string, string> = {
   pocket_money: '零花钱',
-  bonus: '奖励',
+  bonus: '成就/额外奖励',
   gift_in: '收到礼金',
   spend: '支出',
   save: '存入目标',

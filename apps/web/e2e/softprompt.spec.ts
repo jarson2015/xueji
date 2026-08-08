@@ -24,7 +24,7 @@ async function loginAsParent(page: Page) {
 }
 
 test.describe('学迹 SoftPrompt 交互', () => {
-  test('家长退出用 SoftPrompt，Esc 可关，说明可读', async ({ page }) => {
+  test('家长退出用 SoftPrompt，Esc 可关，说明可�?, async ({ page }) => {
     const nativeDialogs: string[] = []
     page.on('dialog', async (d) => {
       nativeDialogs.push(d.type())
@@ -32,11 +32,11 @@ test.describe('学迹 SoftPrompt 交互', () => {
     })
 
     await loginAsParent(page)
-    await page.getByRole('button', { name: '退出' }).first().click()
+    await page.getByRole('button', { name: '退�? }).first().click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await expect(page.getByRole('heading', { name: '退出' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '退�? })).toBeVisible()
     await expect(dialog).toHaveAttribute('aria-describedby', /.+/)
     await expect(dialog.locator('.sp-msg')).toBeVisible()
 
@@ -45,9 +45,9 @@ test.describe('学迹 SoftPrompt 交互', () => {
     expect(nativeDialogs).toEqual([])
   })
 
-  test('SoftPrompt 无输入时确认按钮可聚焦关闭路径', async ({ page }) => {
+  test('SoftPrompt 无输入时确认按钮可聚焦关闭路�?, async ({ page }) => {
     await loginAsParent(page)
-    await page.getByRole('button', { name: '退出' }).first().click()
+    await page.getByRole('button', { name: '退�? }).first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await page.getByRole('button', { name: '取消' }).click()

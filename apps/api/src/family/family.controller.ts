@@ -88,6 +88,8 @@ export class FamilyController {
       allowanceLargeCents: s.allowanceLargeCents,
       allowanceSavePercent: s.allowanceSavePercent,
       allowanceNote: s.allowanceNote,
+      allowanceAchievementBonusEnabled: s.allowanceAchievementBonusEnabled,
+      allowanceAchievementBonusMaxCents: s.allowanceAchievementBonusMaxCents,
       pointsPactEnabled: s.pointsPactEnabled,
       pointsPactMaxAmount: s.pointsPactMaxAmount,
       pointsPactMaxActive: s.pointsPactMaxActive,

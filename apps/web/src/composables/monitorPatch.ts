@@ -18,6 +18,7 @@ export type CheckinCreatedPayload = {
     taskTitle?: string
     note?: string | null
     imageUrl?: string | null
+    hasImage?: boolean
     confirmStatus: string
     isMakeup?: boolean
     createdAt: string | Date

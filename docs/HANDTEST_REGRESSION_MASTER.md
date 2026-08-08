@@ -1,6 +1,6 @@
 # 学迹 · 总手测回归清单
 
-Demo：`parent@demo.com` / `demo1234`；登录码 `102938`（小明）、`203847`（小红）。  
+Demo：`parent@demo.com` / `demo1234`；登录码 `10293847`（小明）、`20384756`（小红）。  
 API 改过后需重启 `apps/api`（约 3000）。前端 `apps/web` 约 5173。
 
 专题清单仍可单独用：[`EDU_THEME_PORTFOLIO_NEAR_REGRESSION.md`](./EDU_THEME_PORTFOLIO_NEAR_REGRESSION.md)。
@@ -23,7 +23,12 @@ API 改过后需重启 `apps/api`（约 3000）。前端 `apps/web` 约 5173。
 - [x] `/uploads/` 无签名或过期签名 → 打不开图（e2e + smoke 401）；带响应签名的图可看（人手抽查）
 - [x] 上传非图片（改扩展名）→ 魔数校验拒绝（API smoke）
 - [x] 零花 / 打卡配图外链 URL → API 拒；本机 `/uploads/...` 可（smoke + `requireSafeUploadPath`）
-- [x] 部署样例：`TRUST_PROXY` + Nginx `limit_req`（`deploy-guard` unit；见 `SECURITY_SECRETS_CHECKLIST`）；生产密钥/`TRUST_PROXY=1` 实装仍人手
+- [x] 部署样例：`TRUST_PROXY` + Nginx `limit_req` + 生产不映射 API/DB 端口（`deploy-guard` unit；见 `SEC_DEPLOY_PR1_PLAN` / `SECURITY_SECRETS_CHECKLIST`）；生产密钥/`TRUST_PROXY=1` 实装仍人手
+- [ ] SEC PR2：刷登录码 / 改学生密码后旧 JWT（码/密码/代登）失效；迁移 0043 清空明文 `login_code`
+- [ ] SEC PR3：代登可打卡；不可提任务/推迟今日/写周主题与周末小会（403）
+- [ ] SEC PR4：图片 URL 含 `uid=`；去 uid / 改 uid → 401；裸路径 401
+- [ ] SEC P2：计划项不可挂未指派 taskId；提议/兑换 WS 提示仍正常
+- [ ] SEC P2b：响应头含 CSP/nosniff；字体与登录正常；周报可开
 
 ---
 
@@ -146,6 +151,31 @@ API 改过后需重启 `apps/api`（约 3000）。前端 `apps/web` 约 5173。
 - [x] 限流「太频繁」友好文案（unit）
 - [ ] 真机：开关 Push 偏好后有/无通知（人手；步骤见 EDU_FAMILY_JOURNAL_P3_PLAN）
 
+## 家庭说说 BBS（UJ）— 见 UI_UX_U1U4_PLAN
+
+- [x] 列表内嵌楼层 + 一层跟帖；帖底行内接话；抽屉为「专注回应」（工程）
+- [ ] 真机：展开全部 / 收起；接话对象提示；删除 SoftPrompt
+
+## 学生今日 UX（U2）— 见 UI_UX_U1U4_PLAN
+
+- [x] Hero 预算 / 打卡最短路径 / 庆祝分龄 / 我的·更多降噪（工程）
+- [ ] 真机：手机吸底完成；young/teen 打卡与庆祝观感
+
+## 家长主路径 UX（U3）— 见 UI_UX_U1U4_PLAN
+
+- [x] Monitor 关系优先 + SoftPrompt 可选说明 + More/Tasks/FamilyEdu 降噪（工程）
+- [ ] 真机：多孩筛选下待办/通过；教育设置深链小贴士
+
+## 登录与 TV UX（U4）— 见 UI_UX_U1U4_PLAN
+
+- [x] 登录品牌 / 仪式屏 / 抽屉安全区 / 客厅导航状态（工程）
+- [ ] 真机：手机登录键盘折叠；客厅导航开/关与仪式屏闸门
+
+## 视觉地基（U1）— 见 UI_UX_U1U4_PLAN
+
+- [x] token / SoftPrompt 层级 / 空·失败态 / 克制动效（工程）
+- [ ] 真机：断网今日/看板失败态；系统「减少动态效果」
+
 ## 教育打磨（P-Edu-A）— 见 EDU_PEDU_A_PLAN
 
 - [x] 家长说说情绪教练回应芯片（unit + e2e）；学生仍为原芯片
@@ -154,8 +184,88 @@ API 改过后需重启 `apps/api`（约 3000）。前端 `apps/web` 约 5173。
 - [ ] 真机：周末小会计时观感
 - [ ] 真机：二次淡出提醒观感
 
+## 分龄情绪路线图 E1–E5 — 见 EDU_AGE_EMOTION_ROADMAP
+
+（E1–E5 工程已完成；真机项仍待勾选。下一教育轨 E6 见下方。）
+
+### E1 — 关系优先与防工具化
+
+- [x] E1.1 Monitor 默认关系摘要；完成率/未完成折叠；无多孩完成率首屏对比
+- [x] E1.2 淡出家庭共见契约；学生可见「少靠积分」一句；GET 不写库
+- [x] E1.3 本周模式/词云「不是评分」声明；不进 Monitor 待办
+- [x] E1.4 兴趣任务勾选预填 0 分且可改
+- [x] E1.5 过载/高压洞察含减负或求助 CTA（无诊断标签）
+- [ ] 真机：看板首屏关系优先观感
+- [ ] 真机：保存淡出后学生今日条；兴趣 0 分；过载求助 SoftPrompt
+
+### E2 — 分龄内容包
+
+- [x] E2.1 ageContentPack 三档差异 unit 通过；general 基线不破
+- [x] E2.2 young 小会短步数/短时长文案；庆祝偏共同调节
+- [x] E2.3 general 淡出引导 + 非买物愿望提示
+- [x] E2.4 teen 提议/换序显眼；Rewards 弱余额；不改积分公式
+- [ ] 真机：young 小会 2 步；teen 今日提议条与弱余额
+
+### E3 — 情绪功能分类
+
+- [x] E3.1 四类映射函数 unit；UI 无情绪分/排行
+- [x] E3.2 家长芯片按类建议；仍无绩效夸
+- [x] E3.3 考试周/周末弱策略条可 dismiss
+- [ ] 真机：看板情绪旁注 + 周末/考试条观感
+
+### E4 — Teen 自主与隐私
+
+- [x] E4.1 teen 反思默认仅自己或周末聚合；家长即时可见需同意
+- [x] E4.2 teen 弱分/weekly_digest 引导；保存才生效
+- [x] E4.3 代登发说说强提示；私密引导；代登不可读写私密
+- [x] E4.4 危机转介静态入口可达；无自动报警
+- [ ] 真机：teen 打卡分享勾选；FamilyEdu 预选周结算；More 求助入口
+
+### E5 — 家长微课与自检
+
+- [x] E5.1 分龄场景微课 5–10 则 + 深链
+- [x] E5.2 月度关系自检可跳过、不打分不上榜
+- [x] E5.3 本分区与路线图 ID 对齐并在落地后更新状态
+- [ ] 真机：FamilyEdu 展开一则微课并点深链；自检跳过/保存后刷新仍在
+
+### E6 — 验收加固 — 见 EDU_E6_HARDENING_PLAN
+
+- [ ] E6.0 E1–E5 真机闸门（上表真机项勾选或记缺陷）
+- [x] E6.1 学生可回看本机私密反思
+- [ ] E6.2（可选）反思 visibility 入库且家长路径尊重 — **暂缓**
+- [x] E6.3 混龄切换孩子后 pack/微课正确
+- [x] E6.4 情绪旁注可深链到对应微课
+- [x] E6.5 e2e 抽样：看板折叠 / teen 反思偏好 / FamilyEdu 小贴士
+- [x] E6.6 本分区与计划文档状态已更新
+
+## V1.5 成就奖金 — 见 V1_5_ACHIEVEMENT_BONUS_PLAN
+
+- [x] V15.0 开关默认关；young 慎用提示
+- [x] V15.1–2 创建并入账仅 allowance `bonus`；points 不变
+- [x] V15.3 家长 SoftPrompt 登记；学生不可自助发放
+- [x] V15.4 学生流水可见「成就奖金」标题
+- [ ] V15.5 跑迁移后 smoke / 真机勾选
+
+## PERF 响应速度 — 见 PERF_P0…P5_PLAN
+
+- [ ] 学生打开带步骤任务 → 抽屉出现步骤（惰性 `GET /my/assigns/:id/steps`）
+- [ ] Monitor 切后台再回 → 默认 lite 刷新（非全量）
+- [ ] 多孩批量确认积分正确（组间并行）
+- [ ] 家长任务编辑 → `GET /tasks/:id` 带出步骤
+- [ ] Today soft 不扇出 order/goal/proposals
+- [ ] 愿望/兑换列表有上限仍可用
+- [ ] 周报纯读；仪式屏 lite
+- [ ] PERF P6：看板首屏进度先出、洞察稍后补；学生计划列表可用
+- [ ] 迁移 0039–0042 或 `apply-perf-indexes.ts`
+
+- [x] 迁移 0039 checkins/assigns 索引（脏 sqlite 可用 `apply-perf-indexes.ts`）
+- [x] Monitor lite/full/etag304 不劣于基线（`bench-monitor.ts`）
+- [ ] 真机：批量确认 10+ 条；打开今日无意外积分入账；说说列表；教育页 keep-alive 软刷新
+
+下一轨索引：[`NEXT_TRACK_INDEX.md`](./NEXT_TRACK_INDEX.md)
+
 ---
 
 ## 仍不做
 
-主题自动绑任务、Quest/Badge、改积分公式、登录码 8 位无迁移、静默全站 SoftPrompt。
+主题自动绑任务、Quest/Badge、改积分公式、登录码 8 位无迁移、静默全站 SoftPrompt、第四 age_band、说说计分/Monitor 待办化、AI 情绪诊断排行。

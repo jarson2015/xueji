@@ -32,7 +32,7 @@
     <el-form-item label="兴趣探索">
       <el-switch v-model="form.isInterest" />
       <p class="muted tiny-hint">
-        打开后，学生端会强调好奇与投入，庆祝时弱化积分；适合阅读、乐器、动手探索。
+        打开后建议 0 分（可改）：学生端强调好奇与投入，庆祝时弱化积分；适合阅读、乐器、动手探索。
       </p>
     </el-form-item>
     <el-form-item v-if="form.isInterest || form.category === 'study'" label="为什么值得做（给学生看）">

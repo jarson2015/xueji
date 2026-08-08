@@ -31,9 +31,12 @@ export class AuthController {
   @Post('login-code')
   async loginCode(@Req() req: any, @Body() dto: LoginCodeDto) {
     const ip = clientIp(req);
-    // Tighten vs 6-digit space: attempts / IP + per-code + failures / IP
+    // Tighten vs digit space: attempts / IP + per-code + failures / IP
     this.rateLimit.consume(`login-code:${ip}`, 8, 15 * 60 * 1000);
-    const codeKey = String(dto.code || '').trim().slice(0, 6);
+    const codeKey = String(dto.code || '')
+      .trim()
+      .replace(/\D/g, '')
+      .slice(0, 8);
     if (codeKey) {
       this.rateLimit.consume(`login-code-val:${codeKey}`, 5, 15 * 60 * 1000);
     }
@@ -52,7 +55,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@CurrentUser() user: { id: number }) {
-    return this.auth.me(user.id);
+  me(@CurrentUser() user: { id: number; isProxy?: boolean }) {
+    return this.auth.me(user.id, !!user.isProxy);
   }
 }

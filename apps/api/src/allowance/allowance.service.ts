@@ -16,6 +16,7 @@ import {
 import { AllowanceAccount } from '../entities/allowance-account.entity';
 import { AllowanceEntry } from '../entities/allowance-entry.entity';
 import { AllowanceGoal } from '../entities/allowance-goal.entity';
+import { AchievementClaim } from '../entities/achievement-claim.entity';
 import { StudentsService } from '../students/students.service';
 import { FamilyService } from '../family/family.service';
 import { EventsGateway } from '../events/events.gateway';
@@ -26,6 +27,7 @@ import {
 } from '../common/edu-policy-math';
 import { requireSafeUploadPath } from '../common/upload-url';
 import {
+  CreateAchievementClaimDto,
   CreateAllowanceEntryDto,
   CreateAllowanceGoalDto,
   ReviewAllowanceEntryDto,
@@ -50,6 +52,8 @@ export class AllowanceService {
     private readonly entries: Repository<AllowanceEntry>,
     @InjectRepository(AllowanceGoal)
     private readonly goals: Repository<AllowanceGoal>,
+    @InjectRepository(AchievementClaim)
+    private readonly claims: Repository<AchievementClaim>,
     private readonly students: StudentsService,
     private readonly family: FamilyService,
     private readonly events: EventsGateway,
@@ -581,6 +585,8 @@ export class AllowanceService {
       reviewNote: e.reviewNote,
       createdAt: e.createdAt,
       postedAt: e.postedAt,
+      refType: e.refType || null,
+      refId: e.refId ?? null,
     };
   }
 
@@ -596,5 +602,161 @@ export class AllowanceService {
       createdAt: g.createdAt,
       updatedAt: g.updatedAt,
     };
+  }
+
+  private claimDto(c: AchievementClaim) {
+    return {
+      id: c.id,
+      familyId: c.familyId,
+      studentUserId: c.studentUserId,
+      title: c.title,
+      note: c.note,
+      amountCents: c.amountCents,
+      status: c.status,
+      postedLedgerId: c.postedLedgerId,
+      createdBy: c.createdBy,
+      postedBy: c.postedBy,
+      createdAt: c.createdAt,
+      postedAt: c.postedAt,
+    };
+  }
+
+  /** V1.5：家长登记成就奖金（draft） */
+  async createAchievement(
+    parentId: number,
+    dto: CreateAchievementClaimDto,
+  ) {
+    await this.students.assertBound(parentId, dto.studentId);
+    await this.assertEnabled(dto.studentId);
+    const cfg = await this.family.allowanceConfigForStudent(dto.studentId);
+    if (!cfg.allowanceAchievementBonusEnabled) {
+      throw new ForbiddenException('未开启成就奖金');
+    }
+    const max = cfg.allowanceAchievementBonusMaxCents || 20000;
+    if (dto.amountCents > max) {
+      throw new BadRequestException(
+        `单笔成就奖金不能超过 ${(max / 100).toFixed(2)} 元`,
+      );
+    }
+    const title = dto.title.trim();
+    if (!title) throw new BadRequestException('请填写成就标题');
+    const claim = await this.claims.save(
+      this.claims.create({
+        familyId: parentId,
+        studentUserId: dto.studentId,
+        title,
+        note: dto.note?.trim() || null,
+        amountCents: dto.amountCents,
+        status: 'draft',
+        postedLedgerId: null,
+        createdBy: parentId,
+        postedBy: null,
+        postedAt: null,
+      }),
+    );
+    return this.claimDto(claim);
+  }
+
+  async postAchievement(parentId: number, claimId: number) {
+    const claim = await this.claims.findOne({ where: { id: claimId } });
+    if (!claim) throw new NotFoundException('找不到这条成就登记');
+    await this.students.assertBound(parentId, claim.studentUserId);
+    if (claim.status !== 'draft') {
+      throw new BadRequestException('只能确认草稿状态的成就奖金');
+    }
+    await this.assertEnabled(claim.studentUserId);
+    const cfg = await this.family.allowanceConfigForStudent(claim.studentUserId);
+    if (!cfg.allowanceAchievementBonusEnabled) {
+      throw new ForbiddenException('未开启成就奖金');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      let account = await manager.findOne(AllowanceAccount, {
+        where: { studentId: claim.studentUserId },
+      });
+      if (!account) {
+        account = await manager.save(
+          manager.create(AllowanceAccount, {
+            studentId: claim.studentUserId,
+            balanceCents: 0,
+          }),
+        );
+      }
+      const now = new Date();
+      const entry = await manager.save(
+        manager.create(AllowanceEntry, {
+          studentId: claim.studentUserId,
+          accountId: account.id,
+          deltaCents: claim.amountCents,
+          kind: AllowanceKind.BONUS,
+          category: null,
+          title: `成就奖金 · ${claim.title}`.slice(0, 80),
+          note: claim.note,
+          imageUrl: null,
+          status: AllowanceEntryStatus.POSTED,
+          goalId: null,
+          createdBy: parentId,
+          reviewedBy: parentId,
+          reviewNote: null,
+          postedAt: now,
+          refType: 'achievement_claim',
+          refId: claim.id,
+        }),
+      );
+      account.balanceCents += claim.amountCents;
+      await manager.save(account);
+      claim.status = 'posted';
+      claim.postedBy = parentId;
+      claim.postedAt = now;
+      claim.postedLedgerId = entry.id;
+      await manager.save(claim);
+
+      await this.audit.record({
+        actorId: parentId,
+        action: 'allowance.achievement_post',
+        studentId: claim.studentUserId,
+        targetType: 'achievement_claim',
+        targetId: claim.id,
+        detail: { amountCents: claim.amountCents },
+      });
+
+      return {
+        claim: this.claimDto(claim),
+        entry: this.entryDto(entry),
+        account: this.accountDto(account),
+      };
+    });
+  }
+
+  async cancelAchievement(parentId: number, claimId: number) {
+    const claim = await this.claims.findOne({ where: { id: claimId } });
+    if (!claim) throw new NotFoundException('找不到这条成就登记');
+    await this.students.assertBound(parentId, claim.studentUserId);
+    if (claim.status !== 'draft') {
+      throw new BadRequestException('只能取消草稿');
+    }
+    claim.status = 'cancelled';
+    await this.claims.save(claim);
+    return this.claimDto(claim);
+  }
+
+  async listAchievements(user: { id: number; role: string }, studentId?: number) {
+    if (user.role === UserRole.STUDENT) {
+      const rows = await this.claims.find({
+        where: { studentUserId: user.id },
+        order: { id: 'DESC' },
+        take: 50,
+      });
+      return rows.map((c) => this.claimDto(c));
+    }
+    const sid = studentId;
+    if (!sid) throw new BadRequestException('请选择孩子');
+    await this.students.assertBound(user.id, sid);
+    const rows = await this.claims.find({
+      where: { studentUserId: sid },
+      order: { id: 'DESC' },
+      take: 50,
+    });
+    return rows.map((c) => this.claimDto(c));
   }
 }

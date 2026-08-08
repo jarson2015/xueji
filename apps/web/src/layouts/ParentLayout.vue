@@ -47,6 +47,12 @@
           <el-button class="tap-btn" text @click="logout">退出</el-button>
         </div>
       </header>
+      <p v-if="showLivingRoomBar" class="tv-living-bar muted" role="status">
+        {{ LIVING_ROOM_COPY.statusBar }}
+        <button type="button" class="tv-living-link" @click="goRestoreNav">
+          {{ LIVING_ROOM_COPY.restoreShort }}
+        </button>
+      </p>
       <main class="main">
         <CachedRouterView :include="[...PARENT_KEEP_ALIVE]" />
       </main>
@@ -123,7 +129,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
-import { useBreakpoint } from '../composables/useBreakpoint'
+import { setTvModeOptIn, useBreakpoint } from '../composables/useBreakpoint'
+import { LIVING_ROOM_COPY } from '../composables/livingRoomCopy'
 import { useParentOnboarding } from '../composables/useOnboarding'
 import { useSocket } from '../composables/useSocket'
 import OnboardingWizard from '../components/OnboardingWizard.vue'
@@ -212,6 +219,15 @@ const tvNav = [
   { to: '/ritual', label: '客厅仪式屏' },
   { to: '/parent/more', label: '更多' },
 ]
+
+/** U4.4：显式客厅壳时提示可恢复（isTv 仅 opt-in） */
+const showLivingRoomBar = computed(() => isTv.value)
+
+function goRestoreNav() {
+  setTvModeOptIn(false)
+  ElMessage.success(LIVING_ROOM_COPY.disabledToast)
+  router.push('/parent/more')
+}
 
 const wizardSteps = [
   {
@@ -406,6 +422,25 @@ onMounted(async () => {
 }
 .tv-brand {
   font-size: 1.6rem;
+}
+.tv-living-bar {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  background: var(--accent-soft, #d8ebe0);
+  color: var(--accent-strong, #1f4d36);
+  border-bottom: 1px solid rgba(47, 111, 78, 0.12);
+}
+.tv-living-link {
+  margin-left: 8px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-strong, #1f4d36);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .user-chip {
   display: flex;

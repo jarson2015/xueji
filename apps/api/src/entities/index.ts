@@ -16,6 +16,7 @@ import { AuditLog } from './audit-log.entity';
 import { AllowanceAccount } from './allowance-account.entity';
 import { AllowanceEntry } from './allowance-entry.entity';
 import { AllowanceGoal } from './allowance-goal.entity';
+import { AchievementClaim } from './achievement-claim.entity';
 import { PointPact } from './point-pact.entity';
 import { PointGift } from './point-gift.entity';
 import { CovenantProposal } from './covenant-proposal.entity';
@@ -51,6 +52,7 @@ export const entities = [
   AllowanceAccount,
   AllowanceEntry,
   AllowanceGoal,
+  AchievementClaim,
   PointPact,
   PointGift,
   CovenantProposal,

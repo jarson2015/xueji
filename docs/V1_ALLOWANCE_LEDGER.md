@@ -284,9 +284,9 @@ migrations/
 
 ---
 
-## 9. 后续（非 V1，仅挂接预留）
+## 9. 后续
 
-- **V1.5 成就奖金：** `kind=bonus` + 来源表 `achievement_claims`；入账只写 allowance，不碰 points。  
+- **V1.5 成就奖金（正式计划）：** [`V1_5_ACHIEVEMENT_BONUS_PLAN.md`](./V1_5_ACHIEVEMENT_BONUS_PLAN.md) — `kind=bonus` + `achievement_claims`；入账只写 allowance，不碰 points。  
 - **V2：** 规则变更双确认、冷静期、周消费温和回顾。
 
 ---

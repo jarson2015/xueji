@@ -9,8 +9,9 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-study_checkin}
       MYSQL_USER: ${MYSQL_USER:-study}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
-    ports:
-      - "3306:3306"
+    # 不映射宿主机 3306；本机调试见 docker-compose.demo.yml
+    expose:
+      - "3306"
     volumes:
       - mysql_data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
@@ -55,8 +56,11 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@localhost}
-    ports:
-      - "3000:3000"
+      # 经 web Nginx 反代时必须开启，限流才用真实客户端 IP
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    # 不映射宿主机 3000，避免绕过 Nginx limit_req；本机调试见 docker-compose.demo.yml
+    expose:
+      - "3000"
     volumes:
       - api_uploads:/app/uploads
     healthcheck:

@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 
 const PARENT_USER = process.env.E2E_PARENT_USER || 'parent@demo.com'
 const PARENT_PASS = process.env.E2E_PARENT_PASS || 'demo1234'
-const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '102938'
+const STUDENT_CODE = process.env.E2E_STUDENT_CODE || '10293847'
 
 async function clearSession(page: Page) {
   await page.goto('/login')
@@ -18,7 +18,7 @@ async function clearSession(page: Page) {
 }
 
 test.describe('学迹近端愿望抽样', () => {
-  test('家长添加愿望：近端模板 ≥6 且可点填', async ({ page }) => {
+  test('家长添加愿望：近端模�?�? 且可点填', async ({ page }) => {
     await clearSession(page)
     await page.getByRole('button', { name: '家长' }).click()
     await page.getByRole('textbox', { name: '账号' }).fill(PARENT_USER)
@@ -31,7 +31,7 @@ test.describe('学迹近端愿望抽样', () => {
     await expect(page.getByText('近端快捷模板')).toBeVisible()
     await expect(page.getByText('近端可兑')).toBeVisible()
     const templates = page.locator('.el-drawer').getByRole('button', {
-      name: /多陪 10 分钟|选今晚故事|公园玩一圈|一起散步/,
+      name: /多陪 10 分钟|选今晚故事|公园玩一圈|一起散�?,
     })
     await expect(templates.first()).toBeVisible()
     await page.getByRole('button', { name: '多陪 10 分钟' }).click()
@@ -55,7 +55,7 @@ test.describe('学迹近端愿望抽样', () => {
       timeout: 15_000,
     })
     const near = page.getByRole('heading', { name: '先兑这些' })
-    const shop = page.getByRole('heading', { name: /愿望商店|慢慢攒/ })
+    const shop = page.getByRole('heading', { name: /愿望商店|慢慢�? })
     await expect(near.or(shop).first()).toBeVisible()
   })
 })
